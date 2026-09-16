@@ -9,14 +9,15 @@ import {
 } from '@nestjs/common';
 import { ShipsService } from './ships.service';
 import { Ship } from './entities/ship.entity';
+import { CreateShipDto } from './dto/create-ship.dto';
 
 @Controller('ships')
 export class ShipsController {
   constructor(private readonly shipsService: ShipsService) {}
 
   @Post()
-  async createShip(@Body() shipData: Partial<Ship>) {
-    return await this.shipsService.create(shipData);
+  async createShip(@Body() createShipDto: CreateShipDto) {
+    return await this.shipsService.create(createShipDto);
   }
 
   @Get()
