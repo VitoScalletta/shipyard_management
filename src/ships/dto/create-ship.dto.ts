@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+} from 'class-validator';
+import { ShipStatus } from '../entities/ship.entity';
 
 export class CreateShipDto {
   @IsString({ message: 'Gemi adı Metin olmalıdır' })
@@ -14,4 +23,57 @@ export class CreateShipDto {
   @IsString()
   @IsOptional()
   shipType?: string;
+
+  @IsString()
+  @IsOptional()
+  shipClass?: string;
+
+  @IsEnum(ShipStatus)
+  @IsOptional()
+  status?: ShipStatus;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  loa?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  beam?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  draft?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  height?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  displacement?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  grossTonnage?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  netTonnage?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  deckArea?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  enclosedArea?: number;
 }
