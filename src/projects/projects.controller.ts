@@ -9,14 +9,16 @@ import {
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { Project } from './entities/project.entity';
+import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
-  async createProject(@Body() projectData: Partial<Project>) {
-    return this.projectsService.create(projectData);
+  async createProject(@Body() createProjectDto: CreateProjectDto) {
+    return this.projectsService.create(createProjectDto as any);
   }
 
   @Get()
@@ -30,8 +32,11 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  updateProject(@Param('id') id: string, @Body() updateData: Partial<Project>) {
-    return this.projectsService.update(id, updateData);
+  updateProject(
+    @Param('id') id: string,
+    @Body() updateProjectDto: UpdateProjectDto,
+  ) {
+    return this.projectsService.update(id, updateProjectDto);
   }
 
   @Delete(':id')

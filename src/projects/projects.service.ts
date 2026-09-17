@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Body, Injectable, NotFoundException } from '@nestjs/common';
 import { Project } from './entities/project.entity';
-import { InjectRepository } from 'node_modules/@nestjs/typeorm/dist/common/typeorm.decorators';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Injectable()
 export class ProjectsService {
@@ -30,15 +31,15 @@ export class ProjectsService {
     return project;
   }
 
-  async update(id: string, updateData: Partial<Project>): Promise<Project> {
-    await this.projectRepository.update(id, updateData);
+  async update(id: string, @Body() updateProjectDto: UpdateProjectDto) {
+    await this.projectRepository.update(id, updateProjectDto);
     return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
     const result = await this.projectRepository.delete(id);
     if (result.affected === 0) {
-      throw new Error('Proje bulunamadı.');
+      throw new NotFoundException('Proje bulunamadı.');
     }
   }
 }

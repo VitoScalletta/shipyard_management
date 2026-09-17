@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Ship } from './entities/ship.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from 'node_modules/@nestjs/typeorm/dist/common/typeorm.decorators';
-
+import { UpdateShipDto } from './dto/update-ship.dto';
 @Injectable()
 export class ShipsService {
   constructor(
@@ -30,8 +30,8 @@ export class ShipsService {
     return ship;
   }
 
-  async update(id: string, updateData: Partial<Ship>): Promise<Ship> {
-    await this.shipRepository.update(id, updateData);
+  async update(id: string, updateShipDto: UpdateShipDto): Promise<Ship> {
+    await this.shipRepository.update(id, updateShipDto);
     return this.findOne(String(id));
   }
 

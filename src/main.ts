@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from 'node_modules/@nestjs/config/dist/config.service';
 
 async function main() {
   const app = await NestFactory.create(AppModule);
@@ -12,6 +13,10 @@ async function main() {
       transform: true,
     }),
   );
-  await app.listen(3000);
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT') || 3000;
+
+  await app.listen(port);
+  console.log(`🚀 Tersane Backend Port ${port} üzerinde çalışıyor.`);
 }
 main();

@@ -10,6 +10,7 @@ import {
 import { ShipsService } from './ships.service';
 import { Ship } from './entities/ship.entity';
 import { CreateShipDto } from './dto/create-ship.dto';
+import { UpdateShipDto } from './dto/update-ship.dto';
 
 @Controller('ships')
 export class ShipsController {
@@ -31,8 +32,8 @@ export class ShipsController {
   }
 
   @Patch(':id')
-  updateShip(@Param('id') id: string, @Body() updateData: Partial<Ship>) {
-    return this.shipsService.update(id, updateData);
+  updateShip(@Param('id') id: string, @Body() updateShipDto: UpdateShipDto) {
+    return this.shipsService.update(id, updateShipDto);
   }
 
   @Delete(':id')

@@ -23,9 +23,13 @@ export class CreateProjectDto {
   @IsOptional()
   type?: ProjectType;
 
-  @IsDateString({ message: 'Geçersiz tarih formatı(YYYY-MM-DD)' })
+  @IsDateString({}, { message: 'Geçersiz tarih formatı(YYYY-MM-DD)' })
   @IsOptional()
-  startDate?: Date;
+  plannedStartDate?: string;
+
+  @IsDateString({}, { message: 'Geçersiz tarih formatı(YYYY-MM-DD)' })
+  @IsOptional()
+  plannedDeliveryDate?: string;
 
   @ValidateNested()
   @Type(() => ShipIdDto)
