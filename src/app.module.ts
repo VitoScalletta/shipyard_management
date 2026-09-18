@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectsModule } from './projects/projects.module';
 import { ShipsModule } from './ships/ships.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ShipAreasModule } from './ship-areas/ship-areas.module';
 import Joi from 'joi';
 
 @Module({
@@ -41,6 +42,7 @@ import Joi from 'joi';
     }),
     ProjectsModule,
     ShipsModule,
+    ShipAreasModule,
   ],
   controllers: [AppController],
   providers: [AppService],

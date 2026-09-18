@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Ship } from './entities/ship.entity';
 import { Repository } from 'typeorm';
-import { InjectRepository } from 'node_modules/@nestjs/typeorm/dist/common/typeorm.decorators';
+import { InjectRepository } from '@nestjs/typeorm';
 import { UpdateShipDto } from './dto/update-ship.dto';
 @Injectable()
 export class ShipsService {

@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Project } from '../../projects/entities/project.entity';
-import { cp } from 'fs';
+import { ShipArea } from 'src/ship-areas/entities/ship-area.entity';
 
 export enum ShipStatus {
   ACTIVE = 'ACTIVE',
@@ -62,6 +62,9 @@ export class Ship {
 
   @OneToMany(() => Project, (project) => project.ship)
   projects: Project[];
+
+  @OneToMany(() => ShipArea,(area) => area.ship)
+  areas: ShipArea[];
 
   @CreateDateColumn()
   createdAt: Date;
