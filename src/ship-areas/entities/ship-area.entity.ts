@@ -1,3 +1,4 @@
+import { MeasurementUnit } from 'src/common/enums/measurement-unit.enum';
 import { Ship } from 'src/ships/entities/ship.entity';
 import {
   Column,
@@ -17,7 +18,7 @@ export enum AreaType {
 @Entity('ship_areas')
 export class ShipArea {
   @PrimaryGeneratedColumn('uuid')
-  id: String;
+  id: string;
 
   @Column({ type: 'varchar', length: 100 })
   name: string;
@@ -27,9 +28,6 @@ export class ShipArea {
 
   @Column({ type: 'decimal', precision: 8, scale: 2, nullable: true })
   size: number;
-
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  unit: string;
 
   @ManyToOne(() => Ship, (ship) => ship.areas, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'ship_id' })
@@ -44,4 +42,7 @@ export class ShipArea {
 
   @OneToMany(() => ShipArea, (area) => area.parentArea)
   subAreas: ShipArea[];
+
+  @Column({ type: 'enum', enum: MeasurementUnit, nullable: true })
+  unit: MeasurementUnit;
 }

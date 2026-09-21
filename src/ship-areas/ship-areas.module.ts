@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ShipArea } from './entities/ship-area.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ShipArea])]
+  imports: [TypeOrmModule.forFeature([ShipArea])],
   controllers: [ShipAreasController],
   providers: [ShipAreasService],
 })

@@ -63,7 +63,7 @@ export class Ship {
   @OneToMany(() => Project, (project) => project.ship)
   projects: Project[];
 
-  @OneToMany(() => ShipArea,(area) => area.ship)
+  @OneToMany(() => ShipArea, (area) => area.ship)
   areas: ShipArea[];
 
   @CreateDateColumn()

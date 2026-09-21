@@ -6,6 +6,8 @@ import { ProjectsModule } from './projects/projects.module';
 import { ShipsModule } from './ships/ships.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ShipAreasModule } from './ship-areas/ship-areas.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 import Joi from 'joi';
 
 @Module({
@@ -43,6 +45,8 @@ import Joi from 'joi';
     ProjectsModule,
     ShipsModule,
     ShipAreasModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

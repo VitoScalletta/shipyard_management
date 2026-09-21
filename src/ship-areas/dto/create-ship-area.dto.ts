@@ -8,6 +8,7 @@ import {
   Min,
 } from 'class-validator';
 import { AreaType } from '../entities/ship-area.entity';
+import { MeasurementUnit } from 'src/common/enums/measurement-unit.enum';
 
 export class CreateShipAreaDto {
   @IsString()
@@ -23,10 +24,6 @@ export class CreateShipAreaDto {
   @IsOptional()
   size?: number;
 
-  @IsString()
-  @IsOptional()
-  unit?: string;
-
   @IsUUID()
   @IsNotEmpty()
   shipId: string;
@@ -34,4 +31,8 @@ export class CreateShipAreaDto {
   @IsUUID()
   @IsOptional()
   parentAreaId?: string;
+
+  @IsEnum(MeasurementUnit)
+  @IsOptional()
+  unit?: MeasurementUnit;
 }
