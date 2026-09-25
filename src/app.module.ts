@@ -8,6 +8,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ShipAreasModule } from './ship-areas/ship-areas.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { TasksModule } from './tasks/tasks.module';
+import { WorkforceModule } from './workforce/workforce.module';
 import Joi from 'joi';
 
 @Module({
@@ -47,6 +49,8 @@ import Joi from 'joi';
     ShipAreasModule,
     UsersModule,
     AuthModule,
+    TasksModule,
+    WorkforceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
