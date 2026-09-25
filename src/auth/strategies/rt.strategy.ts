@@ -15,7 +15,7 @@ export class RtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   }
 
   validate(req: Request, payload: any) {
-    const refreshToken = req.get('Authorization').replace('Bearer', '').trim();
+    const refreshToken = req.get('Authorization')?.replace('Bearer', '').trim();
     if (!refreshToken)
       throw new UnauthorizedException('Refresh token bulunamadı');
     return { ...payload, refreshToken };

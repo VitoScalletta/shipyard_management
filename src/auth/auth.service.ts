@@ -12,7 +12,6 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { access } from 'fs';
 
 @Injectable()
 export class AuthService {
@@ -98,25 +97,25 @@ export class AuthService {
     return tokens;
   }
 
-  private async getTokens(userId: string, email: string, role: string){
+  private async getTokens(userId: string, email: string, role: string) {
     const jwtPayload = { sub: userId, email, role };
 
-    const [at, rt]= await Promise.all([
+    const [at, rt] = await Promise.all([
       this.jwtService.signAsync(jwtPayload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRATION'),
+        expiresIn: this.configService.get<string>('JWT_EXPIRATION') as any,
       }),
-      this.jwtService.signAsync(jwtPayload,{
+      this.jwtService.signAsync(jwtPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION'),
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION') as any,
       }),
     ]);
-    return{ access_token: at, this.refreshTokens: rt};
+    return { access_token: at, refresh_token: rt };
   }
 
-  private async updateRefreshToken(userId: string, refreshToken: string){
+  private async updateRefreshToken(userId: string, refreshToken: string) {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(refreshToken, salt);
-    await this.userRepository.update(userId, { hashedRefreshToken: hash});
+    await this.userRepository.update(userId, { hashedRefreshToken: hash });
   }
 }

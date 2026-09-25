@@ -8,7 +8,6 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { brotliCompress } from 'zlib';
 
 export enum Role {
   ADMIN = 'ADMIN',
@@ -59,5 +58,5 @@ export class User {
   updatedAt: Date;
 
   @Column({ type: 'varchar', nullable: true, select: false })
-  hashedRefreshToken: string;
+  hashedRefreshToken: string | null;
 }
