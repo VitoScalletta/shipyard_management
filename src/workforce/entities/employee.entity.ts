@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToOne,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Department } from '../enums/department.enum';
 import { Shift } from '../enums/shift.enum';
@@ -20,10 +27,10 @@ export class Employee {
   @Column({ type: 'varchar', length: 100 })
   jobPosition: string;
 
-  @Column({type: 'enum', enum : SkillLevel, default: SkillLevel.JUNIOR})
+  @Column({ type: 'enum', enum: SkillLevel, default: SkillLevel.JUNIOR })
   skillLevel: SkillLevel;
 
-  @Column({ type: 'enum', enum: Shift, default: Shift.MORNING})
+  @Column({ type: 'enum', enum: Shift, default: Shift.MORNING })
   shift: Shift;
 
   @Column({ type: 'int', default: 45 })
@@ -32,6 +39,9 @@ export class Employee {
   @Column({ type: 'boolean', default: true })
   isAvailable: boolean;
 
-  @ManyToOne(() => Team, (team) => team.members, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Team, (team) => team.members, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   team: Team;
 }

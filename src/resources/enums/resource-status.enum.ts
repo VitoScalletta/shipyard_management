@@ -1,0 +1,6 @@
+export enum ResourceStatus {
+  AVAILABLE = 'AVAILABLE',
+  IN_USE = 'IN_USE',
+  MAINTENANCE = 'MAINTENANCE',
+  DEPLETED = 'DEPLETED',
+}

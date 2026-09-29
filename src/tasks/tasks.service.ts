@@ -10,14 +10,21 @@ import { Repository } from 'typeorm';
 import { TaskDependency } from './entities/task-dependency.entity';
 import { CreateTaskDependencyDto } from './dto/create-task-dependency.dto';
 import { TaskStatus } from './enums/task-status.enum';
+import { TaskResource } from './entities/task-resource.entity';
+import { Resource } from '../resources/entities/resource.entity';
 
 @Injectable()
 export class TasksService {
   constructor(
+  @InjectRepository(Task)
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
     @InjectRepository(TaskDependency)
     private taskDependencyRepository: Repository<TaskDependency>,
+    @InjectRepository(TaskResource)
+    private taskResourceRepository: Repository<TaskResource>,
+    @InjectRepository(Resource)
+    private resourceRepository: Repository<Resource>,
   ) {}
 
   async addDependency(createDto: CreateTaskDependencyDto) {
@@ -169,5 +176,60 @@ export class TasksService {
         assignedUsers: true,
       },
     });
+  }
+
+  async assignResourceToTask(
+    taskId: string,
+    resourceId: string,
+    requestedQuantity: number,
+  ) {
+    const task = await this.taskRepository.findOne({ where: { id: taskId } });
+    const resource = await this.resourceRepository.findOne({
+      where: { id: resourceId },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Görev bulunamadı.');
+    }
+    if (!resource) {
+      throw new NotFoundException('Kaynak bulunamadı.');
+    }
+
+    if (!task.startDate || !task.plannedEndDate) {
+      throw new BadRequestException(
+        'Tarihleri belli olmayan bir göreve kaynak rezerve edilemez',
+      );
+    }
+
+    const overlappingTasks = await this.taskRepository
+      .createQueryBuilder('task')
+      .innerJoin('task.resources', 'tr')
+      .where('tr.resourceId = :resourceId', { resourceId })
+      .andWhere('task.startDate <= :endDate', { endDate: task.plannedEndDate })
+      .andWhere('task.plannedEndDate >= :startDate', {
+        startDate: task.startDate,
+      })
+      .andWhere('task.id != :taskId', { taskId })
+      .select(['task.id', 'tr.allocatedQuantity'])
+      .getRawMany();
+
+    let concurrentUsage = 0;
+    for (const ot of overlappingTasks) {
+      concurrentUsage += Number(ot.tr_allocatedQuantity);
+    }
+
+    if(resource.totalQuantity < (concurrentUsage + requestedQuantity)){
+      throw new BadRequestException(
+        `Kapasite yetersiz! İstenen tarihler arasında bu kaynaktan sistemde yalnızca ${resource.totalQuantity - concurrentUsage} birim boştadır.`
+      );
+    }
+
+    const assignment = this.taskResourceRepository.create({
+      task,
+      resource,
+      allocatedQuantity: requestedQuantity,
+    });
+
+    return this.taskResourceRepository.save(assignment);
   }
 }

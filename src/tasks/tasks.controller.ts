@@ -15,6 +15,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../users/entities/user.entity';
 import { TaskStatus } from './enums/task-status.enum';
+import { AssignResourceDto } from './dto/assign-resource.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -41,5 +42,18 @@ export class TasksController {
   @Get()
   findAll(){
     return this.taskService.findAll();
+  }
+
+  @Post(':id/resources')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.ENGINEER)
+  assignResource(
+    @Param('id') taskId: string,
+    @Body() assigntDto: AssignResourceDto,
+  ){
+    return this.taskService.assignResourceToTask(
+      taskId,
+      assigntDto.resourceId,
+      assigntDto.quantity,
+    );
   }
 }

@@ -5,6 +5,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -15,6 +16,8 @@ import { Project } from 'src/projects/entities/project.entity';
 import { Ship } from 'src/ships/entities/ship.entity';
 import { ShipArea } from 'src/ship-areas/entities/ship-area.entity';
 import { User } from 'src/users/entities/user.entity';
+import { TaskResource } from './task-resource.entity';
+import { Team } from 'src/workforce/entities/team.entity';
 
 @Entity('tasks')
 export class Task {
@@ -82,4 +85,15 @@ export class Task {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => TaskResource, (taskResource) => taskResource.task)
+  resources: TaskResource[];
+
+  @ManyToMany(() => Team)
+  @JoinTable({
+    name: 'task_teams',
+    joinColumn: { name: 'task_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'team_id', referencedColumnName: 'id'},
+  })
+  assignedTeams: Team[];
 }
