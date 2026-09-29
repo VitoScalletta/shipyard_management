@@ -10,10 +10,21 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { TasksModule } from './tasks/tasks.module';
 import { WorkforceModule } from './workforce/workforce.module';
+import { ResourcesModule } from './resources/resources.module';
+import { PlanningModule } from './planning/planning.module';
+import { AuditModule } from './audit/audit.module';
 import Joi from 'joi';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
@@ -51,6 +62,9 @@ import Joi from 'joi';
     AuthModule,
     TasksModule,
     WorkforceModule,
+    ResourcesModule,
+    PlanningModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],
