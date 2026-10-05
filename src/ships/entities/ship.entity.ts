@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Project } from '../../projects/entities/project.entity';
-import { ShipArea } from 'src/ship-areas/entities/ship-area.entity';
+import { ShipArea } from '../../ship-areas/entities/ship-area.entity';
 
 export enum ShipStatus {
   ACTIVE = 'ACTIVE',

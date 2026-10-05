@@ -89,6 +89,15 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": [
+      "/node_modules/(?!@nestjs/typeorm)"
+    ],
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1",
+      "^@nestjs/typeorm$": "<rootDir>/../test/typeorm-mock.js",
+      "^@nestjs/mapped-types$": "<rootDir>/../test/mapped-types-mock.js",
+      "^@nestjs/jwt$": "<rootDir>/../test/jwt-mock.js",
+      "^@nestjs/config$": "<rootDir>/../test/config-mock.js"
+    }}
   }
-}
