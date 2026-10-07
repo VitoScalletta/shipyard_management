@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Geçerli bir email adresi giriniz' })
@@ -18,5 +18,6 @@ export class RegisterDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   phone?: string;
 }

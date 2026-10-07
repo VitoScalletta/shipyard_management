@@ -26,12 +26,6 @@ export class PlanningService {
       );
     }
 
-    if (tasks.length === 0) {
-      throw new NotFoundException(
-        'Bu projeye ait herhangi bir görev bulunamadı',
-      );
-    }
-
     const totalTasks = tasks.length;
     const completedTask = tasks.filter(
       (t) => t.status === TaskStatus.COMPLETED,
@@ -82,7 +76,7 @@ export class PlanningService {
       .createQueryBuilder('task')
       .innerJoin('task.assignedTeams', 'teams')
       .where('team.id = :teamId', { teamId })
-      .andWhere('task.status NOT IN (:...statuses', {
+      .andWhere('task.status NOT IN (:...statuses)', {
         statuses: [TaskStatus.COMPLETED, TaskStatus.CANCELLED],
       })
       .getMany();
@@ -130,7 +124,7 @@ export class PlanningService {
     tasks.forEach((t) => {
       adj.set(t.id, []);
       revAdj.set(t.id, []);
-      inDegree.set(t.id, Number(t.estimatedHours || 0));
+      inDegree.set(t.id, 0);
       durations.set(t.id, Number(t.estimatedHours || 0));
     });
 

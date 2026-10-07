@@ -12,18 +12,19 @@ import { ProjectsService } from './projects.service';
 import { Project } from './entities/project.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { Roles } from 'src/auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../users/entities/user.entity';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('projects')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
-  async createProject(@Body() createProjectDto: CreateProjectDto) {
+  createProject(@Body() createProjectDto: CreateProjectDto) {
     return this.projectsService.create(createProjectDto as any);
   }
 

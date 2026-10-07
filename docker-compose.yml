@@ -14,6 +14,17 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  postgres_test:
+    image: postgres:15-alpine
+    container_name: shipyard_test_db
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: shipyard_test_db
+    ports:
+      - "5434:5432"
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: shipyard_redis
