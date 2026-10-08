@@ -28,7 +28,7 @@ export class TasksController {
     return this.taskService.create(createTaskDto);
   }
 
-  @Post()
+  @Post('dependencies')
   @Roles(Role.ADMIN, Role.MANAGER, Role.ENGINEER)
   addDependency(@Body() createDependencyDto: CreateTaskDependencyDto) {
     return this.taskService.addDependency(createDependencyDto);

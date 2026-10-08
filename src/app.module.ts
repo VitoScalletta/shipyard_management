@@ -16,6 +16,7 @@ import { AuditModule } from './audit/audit.module';
 import Joi from 'joi';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AiContextModule } from './ai-context/ai-context.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { APP_GUARD } from '@nestjs/core';
     ResourcesModule,
     PlanningModule,
     AuditModule,
+    AiContextModule,
   ],
   controllers: [AppController],
   providers: [AppService],
