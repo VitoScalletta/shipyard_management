@@ -1,22 +1,22 @@
+import { AiOrchestratorService } from './../ai-orchestrator/ai-orchestrator.service';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProjectAnalysis } from './entities/project-analysis.entity';
 import { ProjectContextService } from './project-context.service';
 import { ContextSnapshot } from './entities/context-snapshot.entity';
-import { options } from 'joi';
+import { OnEvent } from '@nestjs/event-emitter';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class AiAnalysisService {
-  private readonly OLLAMA_URL = 'http://127.0.0.1:11434/api/generate';
-  private readonly MODEL_NAME = 'qwen2.5:7b';
-
   constructor(
     @InjectRepository(ProjectAnalysis)
     private readonly analysisRepository: Repository<ProjectAnalysis>,
     @InjectRepository(ContextSnapshot)
     private readonly snapshotRepository: Repository<ContextSnapshot>,
     private readonly contextService: ProjectContextService,
+    private readonly aiOrchestratorService: AiOrchestratorService,
   ) {}
 
   async analyzeProject(projectId: string): Promise<ProjectAnalysis> {
@@ -31,24 +31,14 @@ export class AiAnalysisService {
     const prompt = this.buildPrompt(contextData);
 
     try {
-      const response = await fetch(this.OLLAMA_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.MODEL_NAME,
-          prompt: prompt,
-          format: 'json',
-          stream: false,
-          options: {
-            temperature: 0.1,
-          },
-        }),
-      });
-
-      if (!response.ok) throw new Error('ollama servisine ulaşılamadı');
-
-      const responseData = await response.json();
-      const aiResult = JSON.parse(responseData.response);
+      const messages = [{ role: 'user', content: prompt }];
+      const aiMessage =
+        await this.aiOrchestratorService.routeToAnalystModel(messages);
+      const cleanJsonString = aiMessage.content
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim();
+      const aiResult = JSON.parse(cleanJsonString);
 
       const executionTime = Date.now() - startTime;
 
@@ -61,9 +51,10 @@ export class AiAnalysisService {
         recommendations: aiResult.recommendations || [],
         criticalPathAnalysis: aiResult.criticalPathAnalysis || {},
         model: 'Ollama',
-        modelVersion: this.MODEL_NAME,
+        modelVersion: 'qwen2.5:7b',
         executionTimeMs: executionTime,
       });
+
       const savedAnalysis = await this.analysisRepository.save(analysis);
 
       snapshot.analysisId = savedAnalysis.id;
@@ -110,5 +101,26 @@ export class AiAnalysisService {
         ]
       }
     `;
+  }
+
+  @OnEvent('project.created')
+  @OnEvent('task.updated')
+  async handleTaskUpdatedEvent(payload: { projectId: string }) {
+    console.log(
+      `[Event Tetiklendi] Proje ${payload.projectId} için arka plan analizi başlatılıyor`,
+    );
+    try {
+      await this.analyzeProject(payload.projectId);
+      console.log(`[Event Başarılı] Arka plan analizi tamamlandı.`);
+    } catch (error) {
+      console.error(`[Event Hatası] Otomatik analiz başarısızdır : `, error);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleScheduledAnalysis() {
+    console.log(
+      '[Sistem] Gece vardiyası: tüm aktif projeler için AI analizi başlatıldı',
+    );
   }
 }

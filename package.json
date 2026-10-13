@@ -27,10 +27,12 @@
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/event-emitter": "^12.0.1",
     "@nestjs/jwt": "^12.0.2",
     "@nestjs/mapped-types": "^12.0.0",
     "@nestjs/passport": "^12.0.0",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^12.0.2",
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^12.0.1",
@@ -99,5 +101,6 @@
       "^@nestjs/mapped-types$": "<rootDir>/../test/mapped-types-mock.js",
       "^@nestjs/jwt$": "<rootDir>/../test/jwt-mock.js",
       "^@nestjs/config$": "<rootDir>/../test/config-mock.js"
-    }}
+    }
   }
+}

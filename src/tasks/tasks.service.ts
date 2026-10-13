@@ -12,11 +12,11 @@ import { CreateTaskDependencyDto } from './dto/create-task-dependency.dto';
 import { TaskStatus } from './enums/task-status.enum';
 import { TaskResource } from './entities/task-resource.entity';
 import { Resource } from '../resources/entities/resource.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class TasksService {
   constructor(
-  @InjectRepository(Task)
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
     @InjectRepository(TaskDependency)
@@ -25,6 +25,7 @@ export class TasksService {
     private taskResourceRepository: Repository<TaskResource>,
     @InjectRepository(Resource)
     private resourceRepository: Repository<Resource>,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async addDependency(createDto: CreateTaskDependencyDto) {
@@ -58,8 +59,14 @@ export class TasksService {
       successor,
       type: createDto.type,
     });
-
-    return this.taskDependencyRepository.save(dependency);
+    const savedDependency =
+      await this.taskDependencyRepository.save(dependency);
+    if (predecessor.project?.id) {
+      this.eventEmitter.emit('task.updated', {
+        projectId: predecessor.project.id,
+      });
+    }
+    return savedDependency;
   }
 
   private async checkCircularDependency(
@@ -93,8 +100,41 @@ export class TasksService {
     return false;
   }
 
+  async updateTask(id: string, updateData: any) {
+    const task = await this.taskRepository.findOne({
+      where: { id },
+      relations: { project: true },
+    });
+
+    if (!task) throw new NotFoundException('Görev bulunamadı');
+
+    this.validateTaskDateAndMetrics(
+      updateData.startDate ? new Date(updateData.startDate) : task.startDate,
+      updateData.plannedEndDate
+        ? new Date(updateData.plannedEndDate)
+        : task.plannedEndDate,
+      updateData.estimatedHours !== undefined
+        ? updateData.estimatedHours
+        : task.estimatedHours,
+      updateData.quantity !== undefined ? updateData.quantity : task.quantity,
+    );
+
+    Object.assign(task, updateData);
+    const updatedTask = await this.taskRepository.save(task);
+
+    if (updatedTask.project?.id) {
+      this.eventEmitter.emit('task.updated', {
+        projectId: updatedTask.project.id,
+      });
+    }
+  }
+
   async updateTaskStatus(taskId: string, newStatus: TaskStatus) {
-    const task = await this.taskRepository.findOne({ where: { id: taskId } });
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+      relations: { project: true },
+    });
+
     if (!task) throw new NotFoundException('Görev Bulunamadı');
 
     if (newStatus === TaskStatus.IN_PROGRESS) {
@@ -111,8 +151,14 @@ export class TasksService {
         task.status = TaskStatus.BLOCKED;
         await this.taskRepository.save(task);
 
+        if (task.project?.id) {
+          this.eventEmitter.emit('task.updated', {
+            projectId: task.project.id,
+          });
+        }
+
         throw new BadRequestException(
-          'bu göreve başlayamazsınız önce tamamlanması gereken öncül görevler var. Görev BLOCKED durumuna alındı',
+          'Bu göreve başlayamazsınız, önce tamamlanması gereken öncül görevler var. Görev BLOCKED durumuna alındı',
         );
       }
 
@@ -124,7 +170,15 @@ export class TasksService {
     }
 
     task.status = newStatus;
-    return this.taskRepository.save(task);
+    const savedTask = await this.taskRepository.save(task);
+
+    if (savedTask.project?.id) {
+      this.eventEmitter.emit('task.updated', {
+        projectId: savedTask.project.id,
+      });
+    }
+
+    return savedTask;
   }
 
   validateTaskDateAndMetrics(
@@ -187,7 +241,6 @@ export class TasksService {
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
     });
-
     if (!task) {
       throw new NotFoundException('Görev bulunamadı.');
     }
@@ -218,18 +271,54 @@ export class TasksService {
       concurrentUsage += Number(ot.tr_allocatedQuantity);
     }
 
-    if(resource.totalQuantity < (concurrentUsage + requestedQuantity)){
+    if (resource.totalQuantity < concurrentUsage + requestedQuantity) {
       throw new BadRequestException(
-        `Kapasite yetersiz! İstenen tarihler arasında bu kaynaktan sistemde yalnızca ${resource.totalQuantity - concurrentUsage} birim boştadır.`
+        `Kapasite yetersiz! İstenen tarihler arasında bu kaynaktan sistemde yalnızca ${resource.totalQuantity - concurrentUsage} birim boştadır.`,
       );
     }
-
     const assignment = this.taskResourceRepository.create({
       task,
       resource,
       allocatedQuantity: requestedQuantity,
     });
 
-    return this.taskResourceRepository.save(assignment);
+    const savedAssignment = await this.taskResourceRepository.save(assignment);
+    if (task.project?.id) {
+      this.eventEmitter.emit('task.updated', { projectId: task.project.id });
+    }
+
+    return savedAssignment;
+  }
+
+  async getTaskByNameOrId(searchTerm: string) {
+    return this.taskRepository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.project', 'project')
+      .where('Task.id::text = :term OR task.name ILIKE :search', {
+        term: searchTerm,
+        search: `%${searchTerm}`,
+      })
+      .getOne();
+  }
+
+  async getDelayedTasks(projectId?: string) {
+    const query = this.taskRepository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.project', 'project')
+      .where('task.status != :completed', { completed: TaskStatus.COMPLETED })
+      .andWhere('task.plannedEndDate < :now', { now: new Date() });
+
+    if (projectId) {
+      query.andWhere('task.projectId = :projectId', { projectId });
+    }
+    return query.getMany();
+  }
+
+  async getUserTasks(userName: string) {
+    return this.taskRepository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.assignedUsers', 'user')
+      .where('user.firstname ILIKE :name OR user.lastName ILIKE :name', {
+        name: `%${userName}`}).getMany();
   }
 }

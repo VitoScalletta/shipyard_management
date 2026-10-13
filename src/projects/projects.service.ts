@@ -3,17 +3,24 @@ import { Project } from './entities/project.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CreateProjectDto } from './dto/create-project.dto';
 
 @Injectable()
 export class ProjectsService {
   constructor(
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
+    private eventEmitter: EventEmitter2,
   ) {}
 
-  async create(projectData: Partial<Project>): Promise<Project> {
-    const newProject = this.projectRepository.create(projectData);
-    return this.projectRepository.save(newProject);
+  async create(createProjectDto: CreateProjectDto): Promise<Project> {
+  const project = this.projectRepository.create(createProjectDto);
+    const savedProject = await this.projectRepository.save(project);
+
+    this.eventEmitter.emit('project.created', { projectId: savedProject.id });
+
+    return savedProject;
   }
 
   async findAll(): Promise<Project[]> {

@@ -20,5 +20,6 @@ import { Team } from 'src/workforce/entities/team.entity';
   ],
   controllers: [TasksController],
   providers: [TasksService],
+  exports: [TasksService],
 })
 export class TasksModule {}

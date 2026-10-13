@@ -10,6 +10,7 @@ import { Resource } from '../resources/entities/resource.entity';
 import { AiContextController } from './ai-context.controller';
 import { ProjectAnalysis } from './entities/project-analysis.entity';
 import { AiAnalysisService } from './ai-analysis.service';
+import { AiOrchestratorModule } from '../ai-orchestrator/ai-orchestrator.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { AiAnalysisService } from './ai-analysis.service';
       TaskDependency,
       Employee,
       Resource,
-    ])
+    ]),
+    AiOrchestratorModule,
   ],
   controllers: [AiContextController],
   providers: [ProjectContextService, AiAnalysisService],

@@ -14,9 +14,14 @@ import { ResourcesModule } from './resources/resources.module';
 import { PlanningModule } from './planning/planning.module';
 import { AuditModule } from './audit/audit.module';
 import Joi from 'joi';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AiContextModule } from './ai-context/ai-context.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+import { GarsonAiModule } from './garson-ai/garson-ai.module';
+import { APP_GUARD } from '@nestjs/core';
+import { AiOrchestratorModule } from './ai-orchestrator/ai-orchestrator.module';
+import { AiDatasetModule } from './ai-dataset/ai-dataset.module';
 
 @Module({
   imports: [
@@ -26,6 +31,9 @@ import { AiContextModule } from './ai-context/ai-context.module';
         limit: 100,
       },
     ]),
+
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
@@ -67,8 +75,17 @@ import { AiContextModule } from './ai-context/ai-context.module';
     PlanningModule,
     AuditModule,
     AiContextModule,
+    GarsonAiModule,
+    AiOrchestratorModule,
+    AiDatasetModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    AppService,
+  ],
 })
 export class AppModule {}

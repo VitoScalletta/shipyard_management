@@ -22,7 +22,7 @@ export class AiContextController {
   }
 
   @Post('analyze/:projectId')
-  async analyzeProject(@Param('projectId') projectId: string){
+  async analyzeProject(@Param('projectId') projectId: string) {
     const analysisResult = await this.aiAnalysisService.analyzeProject(projectId);
 
     return{
