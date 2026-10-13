@@ -5,6 +5,19 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+env:
+  NODE_ENV: test
+  PORT: 3000
+  DB_HOST: localhost
+  DB_PORT: 5432
+  DB_USER: test_user
+  DB_PASSWORD: test_password
+  DB_NAME: shipyard_test_db
+  JWT_SECRET: ci_test_jwt_secret_key
+  JWT_EXPIRATION: 15m
+  JWT_REFRESH_SECRET: ci_test_refresh_secret_key
+  JWT_REFRESH_EXPIRATION: 7d
+  OLLAMA_URL: http://127.0.0.1:11434
 
 jobs:
   build-and-test:
@@ -13,12 +26,12 @@ jobs:
 
     steps:
       - name: 📥 Kodu Klonla
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: ⚙️ Node.js Kurulumu
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: 📦 Bağımlılıkları Yükle (Dependencies)
