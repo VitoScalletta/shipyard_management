@@ -11,7 +11,7 @@ import { AiContextController } from './ai-context.controller';
 import { ProjectAnalysis } from './entities/project-analysis.entity';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiOrchestratorModule } from '../ai-orchestrator/ai-orchestrator.module';
-
+import { AiDatasetModule } from '../ai-dataset/ai-dataset.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -24,6 +24,7 @@ import { AiOrchestratorModule } from '../ai-orchestrator/ai-orchestrator.module'
       Resource,
     ]),
     AiOrchestratorModule,
+    AiDatasetModule,
   ],
   controllers: [AiContextController],
   providers: [ProjectContextService, AiAnalysisService],

@@ -7,6 +7,7 @@ import { ProjectContextService } from './project-context.service';
 import { ContextSnapshot } from './entities/context-snapshot.entity';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { AiDatasetService } from '../ai-dataset/ai-dataset.service';
 
 @Injectable()
 export class AiAnalysisService {
@@ -17,6 +18,7 @@ export class AiAnalysisService {
     private readonly snapshotRepository: Repository<ContextSnapshot>,
     private readonly contextService: ProjectContextService,
     private readonly aiOrchestratorService: AiOrchestratorService,
+    private readonly aiDatasetService: AiDatasetService,
   ) {}
 
   async analyzeProject(projectId: string): Promise<ProjectAnalysis> {
@@ -59,7 +61,20 @@ export class AiAnalysisService {
 
       snapshot.analysisId = savedAnalysis.id;
       await this.snapshotRepository.save(snapshot);
-
+      this.aiDatasetService
+        .createLog({
+          agentType: 'ANALYST',
+          modelName: 'Ollama',
+          modelVersion: 'qwen2.5:7b',
+          systemPrompt: 'Sen üst düzey bir Tersane Proje Analistisin...',
+          userPrompt: prompt,
+          shipyardContext: contextData,
+          aiResponse: cleanJsonString,
+          executionTimeMs: executionTime,
+        })
+        .catch((err) =>
+          console.error('Dataset loglama hatası (Analist):', err),
+        );
       return savedAnalysis;
     } catch (error) {
       console.error('AI Analiz Hatası:', error);

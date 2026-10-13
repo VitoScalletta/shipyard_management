@@ -3,6 +3,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { TaskStatus } from '../tasks/enums/task-status.enum';
 import { required } from 'joi';
 import { AiOrchestratorService } from 'src/ai-orchestrator/ai-orchestrator.service';
+import { AiDatasetService } from '../ai-dataset/ai-dataset.service';
 
 @Injectable()
 export class GarsonAiService {
@@ -66,9 +67,11 @@ export class GarsonAiService {
   constructor(
     private readonly tasksService: TasksService,
     private readonly aiOrchestratorService: AiOrchestratorService,
+    private readonly aiDatasetService: AiDatasetService,
   ) {}
 
   async processUserMessage(userId: string, userRole: string, message: string) {
+    const startTime = Date.now();
     const messages = [
       {
         role: 'system',
@@ -78,7 +81,24 @@ export class GarsonAiService {
       { role: 'user', content: message },
     ];
 
-    const aiMessage = await this.aiOrchestratorService.routeToChatModel(messages, this.availableTools);
+    const aiMessage = await this.aiOrchestratorService.routeToChatModel(
+      messages,
+      this.availableTools,
+    );
+
+    const executionTime = Date.now() - startTime;
+
+    this.aiDatasetService
+      .createLog({
+        agentType: 'GARSON',
+        modelName: 'Ollama',
+        modelVersion: 'qwen2.5:3b',
+        systemPrompt: messages[0].content,
+        userPrompt: message,
+        aiResponse: aiMessage.content || JSON.stringify(aiMessage.tool_calls),
+        executionTimeMs: executionTime,
+      })
+      .catch((err) => console.error('Dataset loglama hatası (Garson):', err));
 
     if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
       return this.handleToolCalls(aiMessage.tool_calls, userRole);
