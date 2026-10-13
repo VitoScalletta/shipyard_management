@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TasksService } from './tasks.service';
 import { Task } from './entities/task.entity';
 import { TaskDependency } from './entities/task-dependency.entity';
@@ -59,6 +60,12 @@ describe('TasksService', () => {
         {
           provide: getRepositoryToken(Resource),
           useValue: mockResourceRepository,
+        },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: jest.fn(),
+          },
         },
       ],
     }).compile();

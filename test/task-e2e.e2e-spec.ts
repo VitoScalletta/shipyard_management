@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
+import { AiAnalysisService } from '../src/ai-context/ai-analysis.service';
 
 describe('Task & Dependency E2E Tests', () => {
   let app: INestApplication;
@@ -14,7 +15,10 @@ describe('Task & Dependency E2E Tests', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(AiAnalysisService)
+      .useValue({ handleTaskUpdatedEvent: jest.fn() })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
