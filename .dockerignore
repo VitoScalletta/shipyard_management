@@ -1,0 +1,20 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+npm-debug.log
+
+# Derlenmiş dosyalar
+dist
+coverage
+
+# Çevre Değişkenleri (Burası güvenlik için çok kritik!)
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea

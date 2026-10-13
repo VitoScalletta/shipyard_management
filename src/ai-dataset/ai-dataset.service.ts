@@ -11,7 +11,7 @@ export class AiDatasetService {
     private readonly datasetRepository: Repository<AiTrainingDataset>,
   ) {}
 
-  async createLog(data: Partial<AiTrainingDataset>): Promise<AiTrainingDataset> {
+       async createLog(data: Partial<AiTrainingDataset>): Promise<AiTrainingDataset> {
     const log = this.datasetRepository.create(data);
     return this.datasetRepository.save(log);
   }
