@@ -31,6 +31,18 @@
 $ npm install
 ```
 
+## Database and local configuration
+
+Copy `.env.example` to `.env.development`. To run the NestJS process directly on
+your computer, PostgreSQL must be reachable at `localhost:5433`; for example,
+start the Compose database with
+`docker compose --env-file .env.development up -d postgres`. The hostname
+`postgres` only resolves between containers on the Compose network. To run the
+whole stack in Compose, use
+`docker compose --env-file .env.development up --build -d`; the API container is
+configured to use `postgres:5432` and Ollama at `ollama:11434`. Don't set
+`DB_HOST=postgres` in a host-based IDE launch configuration or shell environment.
+
 ## Compile and run the project
 
 ```bash

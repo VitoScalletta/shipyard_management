@@ -1,20 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AiTrainingDataset } from './entities/ai-training-dataset.entity';
 import { Repository } from 'typeorm';
-import { metadata } from 'reflect-metadata/no-conflict';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class AiDatasetService {
   constructor(
     @InjectRepository(AiTrainingDataset)
     private readonly datasetRepository: Repository<AiTrainingDataset>,
+    @Optional() private readonly metricsService?: MetricsService,
   ) {}
 
-       async createLog(data: Partial<AiTrainingDataset>): Promise<AiTrainingDataset> {
+  async createLog(data: Partial<AiTrainingDataset>): Promise<AiTrainingDataset> {
     const log = this.datasetRepository.create(data);
     return this.datasetRepository.save(log);
   }
+
   async addFeedback(logId: string, isHelpful: boolean, comment?: string) {
     const log = await this.datasetRepository.findOne({ where: { id: logId } });
 
@@ -28,7 +30,7 @@ export class AiDatasetService {
     if (comment) {
       log.feedbackComment = comment;
     }
-
+    this.metricsService?.recordHumanFeedback(isHelpful ? 'positive' : 'negative', 'qwen2.5:7b');
     return this.datasetRepository.save(log);
   }
 

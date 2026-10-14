@@ -1,7 +1,22 @@
-import { Injectable, RequestTimeoutException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Optional,
+  RequestTimeoutException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { MetricsService } from 'src/metrics/metrics.service';
 @Injectable()
 export class AiOrchestratorService {
-  private readonly OLLAMA_URL = 'http://127.0.0.1:11434/api/chat';
+  constructor(
+    private configService: ConfigService,
+    @Optional() private readonly metricsService?: MetricsService,
+  ){
+    const baseUrl = this.configService.get<string>('OLLAMA_URL') || 'http://127.0.0.1:11434';
+    this.OLLAMA_URL = `${baseUrl}/api/chat`;
+  }
+
+  private readonly OLLAMA_URL: string;
 
   private readonly CHAT_MODEL = 'qwen2.5:3b';
   private readonly ANALYST_MODEL = 'qwen2.5:7b';

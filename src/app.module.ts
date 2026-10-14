@@ -19,9 +19,14 @@ import { AiContextModule } from './ai-context/ai-context.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { GarsonAiModule } from './garson-ai/garson-ai.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AiOrchestratorModule } from './ai-orchestrator/ai-orchestrator.module';
 import { AiDatasetModule } from './ai-dataset/ai-dataset.module';
+import { HealthModule } from './health/health.module';
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'crypto';
+import { MetricsModule } from './metrics/metric.module';
+import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 
 @Module({
   imports: [
@@ -86,12 +91,50 @@ import { AiDatasetModule } from './ai-dataset/ai-dataset.module';
     GarsonAiModule,
     AiOrchestratorModule,
     AiDatasetModule,
+    HealthModule,
+    LoggerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const isProduction = config.get<string>('NODE_ENV') === 'production';
+
+        return {
+          pinoHttp: {
+            genReqId: (req, res) => {
+              const existingId = req.headers['x-request-id'];
+              if (existingId) return existingId;
+              const id = randomUUID();
+              res.setHeader('x-request-id', id);
+              return id;
+            },
+            level:
+              config.get<string>('NODE_ENV') === 'test' ? 'silent' : 'info',
+            transport: isProduction
+              ? undefined
+              : {
+                  target: 'pino-pretty',
+                  options: {
+                    singleLine: true,
+                    colorize: true,
+                    translateTime: 'SYS:standard',
+                  },
+                },
+            redact: ['req.headers.authorization'],
+          },
+        };
+      },
+    }),
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
     },
     AppService,
   ],

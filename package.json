@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -34,16 +34,22 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^12.0.2",
     "@nestjs/swagger": "^11.4.7",
+    "@nestjs/terminus": "^12.1.0",
     "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^12.0.1",
+    "@willsoto/nestjs-prometheus": "^7.0.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "helmet": "^8.3.0",
     "joi": "^18.2.9",
+    "nestjs-pino": "^5.3.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.0",
+    "pino-http": "^11.0.0",
+    "pino-pretty": "^13.2.0",
+    "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^1.1.1",
@@ -76,7 +82,7 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
- "jest": {
+  "jest": {
     "moduleFileExtensions": [
       "js",
       "json",
@@ -102,7 +108,9 @@
       "^@nestjs/jwt$": "<rootDir>/../test/jwt-mock.js",
       "^@nestjs/config$": "<rootDir>/../test/config-mock.js",
       "^@nestjs/event-emitter$": "<rootDir>/../test/event-emitter-mock.js",
-      "^@nestjs/passport$": "<rootDir>/../test/passport-mock.js"
+      "^@nestjs/passport$": "<rootDir>/../test/passport-mock.js",
+      "^@nestjs/terminus$": "<rootDir>/../test/terminus-mock.js",
+      "^@willsoto/nestjs-prometheus$": "<rootDir>/../test/prometheus-mock.js"
     }
   }
 }

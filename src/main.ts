@@ -1,15 +1,21 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import {
+  ValidationPipe,
+  ClassSerializerInterceptor,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import helmet from 'helmet';
 import * as express from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger } from 'nestjs-pino';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function main() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   app.use(helmet());
   app.use(express.json({ limit: '2mb' }));
@@ -45,9 +51,12 @@ async function main() {
     .addBearerAuth()
     .build();
 
+  app.useLogger(app.get(Logger));
+  app.useGlobalFilters(new AllExceptionsFilter());
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/v1/docs', app, document);
   app.enableCors();
-  await app.listen(3000);
+  const port = app.get(ConfigService).get<number>('PORT', 3000);
+  await app.listen(process.env.PORT ?? 3000);
 }
 main();

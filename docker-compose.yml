@@ -10,6 +10,13 @@ services:
       - "3000:3000"
     env_file:
       - .env.development
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      DB_NAME: ${DB_NAME:-shipyard_db}
+      OLLAMA_URL: http://ollama:11434
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,6 +85,11 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health/liveness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     # NOT: GPU (Nvidia) ayarı opsiyonel yapıldı. Eğer deploy edilecek sunucuda
     # fiziksel bir GPU varsa aşağıdaki satırların (deploy bloğu) yorum satırını ( # ) kaldırabilirsin.
     # Aksi takdirde CPU sunucularında projenin çökmesine neden olur.
@@ -88,7 +100,6 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
-
 volumes:
   postgres_data:
   redis_data:
