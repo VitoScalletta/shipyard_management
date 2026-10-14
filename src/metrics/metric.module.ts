@@ -13,7 +13,7 @@ import { MetricsService } from './metrics.service';
     PrometheusModule.register({
       path: '/metrics',
       defaultMetrics: {
-        enabled: true, 
+        enabled: true,
       },
     }),
   ],
