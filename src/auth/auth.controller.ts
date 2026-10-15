@@ -6,6 +6,7 @@ import {
   HttpStatus,
   UseGuards,
   Req,
+  Get,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -43,5 +44,11 @@ export class AuthController {
   refreshTokens(@Req() req: Request) {
     const user = (req as any).user;
     return this.authService.refreshTokens(user.sub, user.refreshToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getProfile(@Req() req: Request & { user: { id: string } }) {
+    return req.user;
   }
 }

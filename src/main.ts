@@ -21,12 +21,6 @@ async function main() {
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-  app.enableCors({
-    origin: ['http://localhost:3001', 'http://localhost:3000'],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credential: true,
-  });
-
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
     new TransformInterceptor(),
@@ -55,8 +49,12 @@ async function main() {
   app.useGlobalFilters(new AllExceptionsFilter());
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/v1/docs', app, document);
-  app.enableCors();
   const port = app.get(ConfigService).get<number>('PORT', 3000);
+  app.enableCors({
+    origin: ['http://localhost:3001', 'http://localhost:3000'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credential: true,
+  });
   await app.listen(process.env.PORT ?? 3000);
 }
 main();
