@@ -23,50 +23,51 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Shipyard Management is a full-stack application with a NestJS API in `backend/`
+and a React/Vite client in `frontend/`.
 
 ## Project setup
 
 ```bash
-$ npm install
+$ npm ci --prefix backend
+$ npm ci --prefix frontend
 ```
 
 ## Database and local configuration
 
-Copy `.env.example` to `.env.development`. To run the NestJS process directly on
-your computer, PostgreSQL must be reachable at `localhost:5433`; for example,
-start the Compose database with
-`docker compose --env-file .env.development up -d postgres`. The hostname
-`postgres` only resolves between containers on the Compose network. To run the
-whole stack in Compose, use
-`docker compose --env-file .env.development up --build -d`; the API container is
-configured to use `postgres:5432` and Ollama at `ollama:11434`. Don't set
-`DB_HOST=postgres` in a host-based IDE launch configuration or shell environment.
+Copy `backend/.env.example` to `backend/.env.development`. To run the API locally,
+PostgreSQL must be reachable at `localhost:5433`. Start the database with
+`docker compose up -d postgres`. The hostname `postgres` only resolves between
+containers on the Compose network. To run the API and supporting services in
+Compose, use `docker compose up --build -d`.
 
 ## Compile and run the project
 
 ```bash
 # development
-$ npm run start
+$ npm --prefix backend run start
 
 # watch mode
-$ npm run start:dev
+$ npm --prefix backend run start:dev
 
 # production mode
-$ npm run start:prod
+$ npm --prefix backend run start:prod
+
+# frontend development server
+$ npm --prefix frontend run dev
 ```
 
 ## Run tests
 
 ```bash
 # unit tests
-$ npm run test
+$ npm --prefix backend run test
 
 # e2e tests
-$ npm run test:e2e
+$ npm --prefix backend run test:e2e
 
 # test coverage
-$ npm run test:cov
+$ npm --prefix backend run test:cov
 ```
 
 ## Deployment

@@ -47,15 +47,24 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: 📦 Bağımlılıkları Yükle (Dependencies)
-        run: npm ci
+        run: npm ci --prefix backend
+
+      - name: 📦 Frontend Bağımlılıklarını Yükle
+        run: npm ci --prefix frontend
 
       - name: 🏗️ Projeyi Derle (Build)
-        run: npm run build
+        run: npm --prefix backend run build
+
+      - name: 🏗️ Frontend'i Derle
+        run: npm --prefix frontend run build
 
       - name: 🧪 Unit Testleri Çalıştır
-        run: npm run test
+        run: npm --prefix backend run test
 
       - name: 🚀 E2E Uçtan Uca Testleri Çalıştır
-        run: npm run test:e2e
+        run: npm --prefix backend run test:e2e
