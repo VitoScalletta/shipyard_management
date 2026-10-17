@@ -11,13 +11,13 @@ import {
 } from 'typeorm';
 import { TaskPriority } from '../enums/task-priority.enum';
 import { TaskStatus } from '../enums/task-status.enum';
-import { MeasurementUnit } from 'src/common/enums/measurement-unit.enum';
-import { Project } from 'src/projects/entities/project.entity';
-import { Ship } from 'src/ships/entities/ship.entity';
-import { ShipArea } from 'src/ship-areas/entities/ship-area.entity';
-import { User } from 'src/users/entities/user.entity';
+import { MeasurementUnit } from '../../common/enums/measurement-unit.enum';
+import { Project } from '../../projects/entities/project.entity';
+import { Ship } from '../../ships/entities/ship.entity';
+import { ShipArea } from '../../ship-areas/entities/ship-area.entity';
+import { User } from '../../users/entities/user.entity';
 import { TaskResource } from './task-resource.entity';
-import { Team } from 'src/workforce/entities/team.entity';
+import { Team } from '../../workforce/entities/team.entity';
 
 @Entity('tasks')
 export class Task {

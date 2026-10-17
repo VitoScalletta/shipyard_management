@@ -1,5 +1,5 @@
-import { MeasurementUnit } from 'src/common/enums/measurement-unit.enum';
-import { Ship } from 'src/ships/entities/ship.entity';
+import { MeasurementUnit } from '../../common/enums/measurement-unit.enum';
+import { Ship } from '../../ships/entities/ship.entity';
 import {
   Column,
   Entity,

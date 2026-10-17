@@ -39,7 +39,9 @@ Copy `backend/.env.example` to `backend/.env.development`. To run the API locall
 PostgreSQL must be reachable at `localhost:5433`. Start the database with
 `docker compose up -d postgres`. The hostname `postgres` only resolves between
 containers on the Compose network. To run the API and supporting services in
-Compose, use `docker compose up --build -d`.
+Compose, use `docker compose up --build -d`. The Compose API is published on
+`localhost:3001` so the local backend can use `localhost:3000` without a port
+conflict; the frontend Vite server is allowed by CORS on `localhost:5173`.
 
 ## Compile and run the project
 
