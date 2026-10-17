@@ -1,22 +1,26 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { Ship, Activity, Clock, Users, AlertOctagon, Layers, ChevronRight, TriangleAlert, Plus, BrainCircuit } from 'lucide-react';
+import { Ship, Activity, Clock, Users, AlertOctagon, Layers, ChevronRight, TriangleAlert, Plus, BrainCircuit, Edit, Trash2 } from 'lucide-react';
 import CriticalPathGraph from './CriticalPathGraph';
 import TaskListView from './TaskListView';
 import NewTaskModal from './NewTaskModal';
 import AiRiskPanel from './AiRiskPanel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Skeleton } from '@/ui/Skeleton';
+import EditProjectModal from './EditProjectModal';
 
 export default function ProjectDashboard() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
   const [activeZone, setActiveZone] = useState('ALL');
   const [viewMode, setViewMode] = useState<'DAG' | 'LIST'>('DAG');
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [expandedZones, setExpandedZones] = useState<Record<string, boolean>>({
     Z1: true,
@@ -36,35 +40,48 @@ export default function ProjectDashboard() {
     const fetchProjectData = async () => {
       try {
         setIsLoading(true);
-        // Backend'den projeyi ve bölgeleri paralel çekiyoruz
-        const [projectRes, zonesRes] = await Promise.all([api.get(`/projects/${id}`), api.get(`/projects/${id}/zones`)]);
-        const projectData = projectRes.data;
-        const [tasksRes, dependenciesRes] = await Promise.all([
-          api.get('/tasks'),
-          api.get('/tasks/dependencies', { params: { projectId: projectData.id } }),
+        // 1. Proje ve Bölgeleri Çek (Burası kesin çalışıyor)
+        const [projectRes, zonesRes] = await Promise.all([
+          api.get(`/projects/${id}`),
+          api.get(`/projects/${id}/zones`)
         ]);
-        const projectTasks = tasksRes.data.filter((task: any) => task.project?.id === projectData.id);
-        setDependencies(dependenciesRes.data);
-        setTasks(projectTasks.map((task: any) => ({
+        const projectData = projectRes.data;
+
+        // 2. Görevleri Çek (Backend uçları henüz yoksa ana sayfayı PATLATMASIN diye ayrı try-catch içinde)
+        let fetchedTasks = [];
+        let fetchedDeps = [];
+        try {
+          const tasksRes = await api.get('/tasks');
+          fetchedTasks = tasksRes.data.filter((task: any) => task.project?.id === projectData.id);
+          const depsRes = await api.get('/tasks/dependencies', { params: { projectId: projectData.id } });
+          fetchedDeps = depsRes.data;
+        } catch (taskError) {
+          console.warn('Görev (Task) API uçları henüz hazır değil, ağ haritası boş render edilecek.');
+        }
+
+        setDependencies(fetchedDeps);
+        setTasks(fetchedTasks.map((task: any) => ({
           ...task,
-          dependencies: dependenciesRes.data
+          dependencies: fetchedDeps
             .filter((dependency: any) => dependency.successor?.id === task.id)
             .map((dependency: any) => ({ predecessor: dependency.predecessor })),
         })));
-        const progress = Number(projectData.progressPercentage ?? 0);
+
+        // 3. Proje Verilerini Ekrana Uyarla
+        const progress = Number(projectData.progressPercentage ?? projectData.progress ?? 0);
         setProject({
           ...projectData,
-          code: projectData.projectCode,
+          code: projectData.projectCode || projectData.code,
           health: projectData.priority === 'CRITICAL' ? 'CRITICAL' : 'GOOD',
           progress,
           plannedProgress: progress,
           delayDays: 0,
-          dueDate: projectData.plannedDeliveryDate,
-          manHoursSpent: Number(projectData.actualManHours ?? 0),
-          manHoursEstimated: Number(projectData.estimatedManHours ?? 0),
+          dueDate: projectData.plannedDeliveryDate || projectData.dueDate,
+          manHoursSpent: Number(projectData.actualManHours ?? projectData.manHoursSpent ?? 0),
+          manHoursEstimated: Number(projectData.estimatedManHours ?? projectData.manHoursEstimated ?? 0),
         });
 
-        // Gelen düz bölgeleri (Z1, Z1-A) hiyerarşik yapıya çevirme işlemi (isteğe bağlı olarak backend de yapabilir)
+        // 4. Bölgeleri (Zones) Hiyerarşik Hale Getir
         const allZones = zonesRes.data.map((zone: any) => ({
           ...zone,
           parentId: zone.parentArea?.id ?? null,
@@ -81,10 +98,8 @@ export default function ProjectDashboard() {
         setZones(mainZones);
       } catch (error) {
         console.error('Proje verisi çekilemedi:', error);
-        const status = (error as any).response?.status;
-        const message = status === 404 ? 'Proje bulunamadı. Proje kodunu ve veritabanı seed kayıtlarını kontrol edin.' : status === 401 ? 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.' : 'Proje bilgileri yüklenemedi. Backend ve veritabanı bağlantısını kontrol edin.';
-        setLoadError(message);
-        toast.error(message);
+        setLoadError('Proje bilgileri yüklenemedi. Backend bağlantısını kontrol edin.');
+        toast.error('Proje yüklenemedi.');
       } finally {
         setIsLoading(false);
       }
@@ -97,6 +112,20 @@ export default function ProjectDashboard() {
 
   const toggleZone = (zoneId: string) => {
     setExpandedZones((prev) => ({ ...prev, [zoneId]: !prev[zoneId] }));
+  };
+
+  // EKLENDİ: Silme Fonksiyonu
+  const executeDeleteProject = async () => {
+    try {
+      await api.delete(`/projects/${id}`);
+      toast.success('Proje kalıcı olarak silindi.');
+      setIsDeleteModalOpen(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Silme hatası:', error);
+      toast.error('Proje silinirken bir hata oluştu.');
+      setIsDeleteModalOpen(false);
+    }
   };
 
   // Veri yüklenirken iskelet ekranı göster
@@ -143,6 +172,24 @@ export default function ProjectDashboard() {
                 <span>Proje ID: {project.id}</span>
               </div>
             </div>
+          </div>
+
+          {/* EKLENDİ: Düzenle ve Sil Butonları */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="flex items-center justify-center rounded-md border border-slate-700 bg-slate-800/50 p-2.5 text-slate-400 transition-all hover:border-cyan-500/50 hover:bg-slate-800 hover:text-cyan-400"
+              title="Projeyi Düzenle"
+            >
+              <Edit className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="flex items-center justify-center rounded-md border border-slate-700 bg-slate-800/50 p-2.5 text-slate-400 transition-all hover:border-rose-500/50 hover:bg-slate-800 hover:text-rose-500"
+              title="Projeyi Sil"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -337,6 +384,41 @@ export default function ProjectDashboard() {
         tasks={tasks}
         onCreated={handleTaskUpdated}
       />
+
+      {/* EKLENDİ: Düzenleme Modalı */}
+      <EditProjectModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        project={project}
+        onUpdated={handleTaskUpdated}
+      />
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsDeleteModalOpen(false)} className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md overflow-hidden rounded-xl border border-rose-500/30 bg-slate-900 shadow-2xl"
+            >
+              <div className="flex flex-col items-center p-8 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 border border-rose-500/20">
+                  <TriangleAlert className="h-8 w-8 text-rose-500 animate-pulse" />
+                </div>
+                <h2 className="mb-2 text-xl font-bold text-slate-100">Projeyi Silmek Üzeresiniz!</h2>
+                <p className="mb-6 text-sm text-slate-400">
+                  <strong className="text-white">{project?.name}</strong> projesini ve ona bağlı tüm görevleri, bölgeleri ve AI analizlerini kalıcı olarak sileceksiniz. Bu işlem <span className="text-rose-400">geri alınamaz.</span> Onaylıyor musunuz?
+                </p>
+                <div className="flex w-full gap-3">
+                  <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 rounded-md border border-slate-700 bg-slate-800 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white">Vazgeç</button>
+                  <button onClick={executeDeleteProject} className="flex-1 rounded-md bg-rose-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.4)]">Evet, Kalıcı Olarak Sil</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

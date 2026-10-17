@@ -82,4 +82,8 @@ export class CreateProjectDto {
   @Type(() => ShipIdDto)
   @IsOptional()
   ship?: ShipIdDto;
+
+  @IsOptional()
+  @IsString()
+  manager?: string;
 }

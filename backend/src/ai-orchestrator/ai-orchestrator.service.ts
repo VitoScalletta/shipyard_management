@@ -30,7 +30,7 @@ export class AiOrchestratorService {
         stream: false,
       },
       {
-        timeoutMs: 15000, //15sn
+        timeoutMs: 150000, //15sn chatin cevap vermesi için
         maxRetries: 2,
       },
     );
@@ -44,7 +44,7 @@ export class AiOrchestratorService {
         stream: false,
       },
       {
-        timeoutMs: 300000,
+        timeoutMs: 600000,//analistin cevap vermesi için gereken süre
         maxRetries: 3,
       },
     );

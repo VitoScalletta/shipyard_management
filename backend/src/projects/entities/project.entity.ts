@@ -90,4 +90,7 @@ export class Project {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ nullable: true })
+  manager: string;
 }
