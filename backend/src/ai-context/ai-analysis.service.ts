@@ -82,7 +82,16 @@ export class AiAnalysisService {
         'Proje analiz edilirken AI servisinde bir hata oluştu.',
       );
     }
+
   }
+
+  async getLatestAnalysis(projectId: string): Promise<ProjectAnalysis | null> {
+    return this.analysisRepository.findOne({
+      where: { projectId },
+      order: { generatedTimestamp: 'DESC' },
+    });
+  }
+
   private buildPrompt(context: any): string {
     return `
       Sen üst düzey bir Tersane Proje Analistisin. Görevin, aşağıda verilen JSON formatındaki proje verilerini incelemek ve tespit ettiğin riskleri, darboğazları ve çözüm önerilerini SADECE JSON formatında döndürmektir.

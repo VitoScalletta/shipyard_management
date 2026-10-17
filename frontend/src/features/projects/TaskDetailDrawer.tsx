@@ -1,4 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import {
   X, Clock, Users, Wrench, AlertTriangle,
   CheckCircle2, Activity, AlertOctagon, ShieldAlert
@@ -8,9 +10,20 @@ interface TaskDetailDrawerProps {
   isOpen: boolean;
   task: any;
   onClose: () => void;
+  onTaskUpdated: () => void;
 }
 
-export default function TaskDetailDrawer({ isOpen, task, onClose }: TaskDetailDrawerProps) {
+export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated }: TaskDetailDrawerProps) {
+  const completeTask = async () => {
+    try {
+      await api.patch(`/tasks/${task.id}/status`, { status: 'COMPLETED' });
+      toast.success('Görev tamamlandı olarak kaydedildi.');
+      onTaskUpdated();
+      onClose();
+    } catch (error) {
+      toast.error('Görev durumu güncellenemedi.');
+    }
+  };
   // Görev durumuna göre renk ve ikon seçimi
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -136,7 +149,7 @@ export default function TaskDetailDrawer({ isOpen, task, onClose }: TaskDetailDr
               <button className="rounded bg-slate-800 py-2.5 font-sans text-xs font-bold text-slate-300 transition-colors hover:bg-slate-700">
                 SORUN BİLDİR
               </button>
-              <button className="rounded bg-cyan-600 py-2.5 font-sans text-xs font-bold text-white shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-colors hover:bg-cyan-500">
+              <button onClick={completeTask} disabled={task.status === 'COMPLETED'} className="rounded bg-cyan-600 py-2.5 font-sans text-xs font-bold text-white shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
                 GÖREVİ TAMAMLA
               </button>
             </div>

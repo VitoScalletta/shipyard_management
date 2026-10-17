@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
@@ -16,6 +17,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../users/entities/user.entity';
 import { TaskStatus } from './enums/task-status.enum';
 import { AssignResourceDto } from './dto/assign-resource.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,9 +41,20 @@ export class TasksController {
     return this.taskService.updateTaskStatus(id, status);
   }
 
+  @Patch(':id')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.ENGINEER, Role.WORKER)
+  updateTask(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
+    return this.taskService.updateTask(id, updateTaskDto);
+  }
+
   @Get()
   findAll(){
     return this.taskService.findAll();
+  }
+
+  @Get('dependencies')
+  findDependencies(@Query('projectId') projectId: string) {
+    return this.taskService.findDependenciesByProject(projectId);
   }
 
   @Post(':id/resources')

@@ -4,6 +4,8 @@ import {
   Bot, X, Send, Command, Clock,
   CheckCircle2, AlertOctagon
 } from 'lucide-react';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface GarsonAiDrawerProps {
   isOpen: boolean;
@@ -42,9 +44,9 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // Sahte AI Yanıt Motoru (Mock Qwen2.5:3b)
-  const handleSend = (text: string) => {
+  const handleSend = async (text: string) => {
     if (!text.trim()) return;
+    if (isTyping) return;
 
     // Kullanıcı mesajını ekle
     const newUserMsg: Message = { id: Date.now().toString(), role: 'user', type: 'text', content: text };
@@ -52,44 +54,30 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
     setInputValue('');
     setIsTyping(true);
 
-    // AI düşünme süresi simulasyonu
-    setTimeout(() => {
-      let aiResponse: Message;
-
-      // 1. Zengin Etkileşim: Geciken Görev Kartları
-      if (text.includes('geciken görevleri')) {
-        aiResponse = {
-          id: (Date.now() + 1).toString(),
-          role: 'ai',
-          type: 'task_list',
-          content: [
-            { id: '104', name: 'Pervane Şaft İncelemesi', delay: '5 Gün', status: 'DELAYED' },
-            { id: '107', name: 'Ana Katman Epoksi', delay: 'Bloke', status: 'BLOCKED' }
-          ]
-        };
-      }
-      // 2. Zengin Etkileşim: Aksiyon Onay Kartı
-      else if (text.includes('tamamlandı yap')) {
-        aiResponse = {
-          id: (Date.now() + 1).toString(),
-          role: 'ai',
-          type: 'action_success',
-          content: { taskId: '123', taskName: 'Kalite Kontrol (Boya)', message: 'Görev başarıyla "Tamamlandı" olarak işaretlendi ve kritik yol güncellendi.' }
-        };
-      }
-      // 3. Standart Metin Yanıtı
-      else {
-        aiResponse = {
-          id: (Date.now() + 1).toString(),
-          role: 'ai',
-          type: 'text',
-          content: 'Sistem veritabanını taradım. İlgili kayıtlar analiz edildi. Destek olabileceğim başka bir detay var mı?'
-        };
-      }
-
-      setMessages(prev => [...prev, aiResponse]);
+    try {
+      const { data: result } = await api.post('/garson/chat', { message: text });
+      const assistantContent = result?.data ?? result;
+      const content = typeof assistantContent === 'string'
+        ? assistantContent
+        : JSON.stringify(assistantContent, null, 2);
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        type: 'text',
+        content,
+      }]);
+    } catch (error: any) {
+      const message = error.response?.data?.message ?? 'Garson AI isteği başarısız oldu.';
+      toast.error(Array.isArray(message) ? message.join(', ') : message);
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        type: 'text',
+        content: Array.isArray(message) ? message.join(', ') : message,
+      }]);
+    } finally {
       setIsTyping(false);
-    }, 1500); // 1.5 saniye AI gecikmesi
+    }
   };
 
   // Zengin Mesaj Render Motoru

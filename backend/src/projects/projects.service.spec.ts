@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ProjectsService } from './projects.service';
 import { Project } from './entities/project.entity';
+import { ShipArea } from '../ship-areas/entities/ship-area.entity';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
@@ -16,6 +17,9 @@ describe('ProjectsService', () => {
     update: jest.fn(),
     delete: jest.fn(),
   };
+  const mockShipAreaRepository = {
+    find: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,6 +28,10 @@ describe('ProjectsService', () => {
         {
           provide: getRepositoryToken(Project),
           useValue: mockProjectRepository,
+        },
+        {
+          provide: getRepositoryToken(ShipArea),
+          useValue: mockShipAreaRepository,
         },
         {
           provide: EventEmitter2,
@@ -60,9 +68,28 @@ describe('ProjectsService', () => {
   describe('findOne', () => {
     it('var olan bir projeyi id ile bulmalıdır', async () => {
       const expectedProject = { id: '1', name: 'Yunustur 1 Proje' };
-      mockProjectRepository.findOne.mockResolvedValue(expectedProject);
+      mockProjectRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(expectedProject);
       const result = await service.findOne('1');
       expect(result).toEqual(expectedProject);
+      expect(mockProjectRepository.findOne).toHaveBeenLastCalledWith({
+        where: { id: '1' },
+        relations: { ship: true },
+      });
+    });
+
+    it('eski demo proje kodunu kayıtlı proje koduna çözmelidir', async () => {
+      const expectedProject = { id: '1', projectCode: 'BLD-2026-08' };
+      mockProjectRepository.findOne.mockResolvedValue(expectedProject);
+
+      const result = await service.findOne('PRJ-084');
+
+      expect(result).toEqual(expectedProject);
+      expect(mockProjectRepository.findOne).toHaveBeenCalledWith({
+        where: { projectCode: 'BLD-2026-08' },
+        relations: { ship: true },
+      });
     });
 
     it('var olmayan bir projeyi id ile bulmaya çalıştığında NotFoundException fırlatmalıdır', async () => {

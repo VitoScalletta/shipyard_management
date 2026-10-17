@@ -1,12 +1,14 @@
 import { Clock, Users, Activity, CheckCircle2, AlertOctagon } from 'lucide-react';
 
-const MOCK_TASKS = [
-  { id: '1', label: 'Yüzey Hazırlığı & Kumlama', status: 'COMPLETED', duration: '3 Gün', team: 4, isCritical: true, deps: '-' },
-  { id: '2', label: 'Astar Boya Uygulaması', status: 'IN_PROGRESS', duration: '2 Gün', team: 2, isCritical: true, deps: 'Görev 1' },
-  { id: '3', label: 'Pervane Şaft İncelemesi', status: 'DELAYED', duration: '5 Gün', team: 3, isCritical: false, deps: 'Görev 1' },
-  { id: '4', label: 'Ana Katman Epoksi', status: 'BLOCKED', duration: '4 Gün', team: 5, isCritical: true, deps: 'Görev 2' },
-  { id: '5', label: 'Kalite Kontrol (Boya)', status: 'PENDING', duration: '1 Gün', team: 1, isCritical: true, deps: 'Görev 4' },
-];
+interface TaskListItem {
+  id: string;
+  name: string;
+  status: string;
+  estimatedHours?: number;
+  assignedUsers?: { id: string }[];
+  isCritical?: boolean;
+  dependencies?: { predecessor: { id: string; name: string } }[];
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -18,7 +20,11 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-export default function TaskListView() {
+export default function TaskListView({
+  tasks,
+}: {
+  tasks: TaskListItem[];
+}) {
   return (
     <div className="h-full w-full overflow-auto p-2">
       <div className="rounded-lg border border-slate-800 bg-slate-900/40">
@@ -33,24 +39,24 @@ export default function TaskListView() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50">
-            {MOCK_TASKS.map((task) => (
+            {tasks.map((task) => (
               <tr key={task.id} className="transition-colors hover:bg-slate-800/40">
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-200">{task.label}</span>
+                    <span className="font-medium text-slate-200">{task.name}</span>
                     {task.isCritical && (
                       <span className="rounded bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 text-[9px] font-bold text-rose-400">KRİTİK</span>
                     )}
                   </div>
                 </td>
                 <td className="px-5 py-4">{getStatusBadge(task.status)}</td>
-                <td className="px-5 py-4 font-mono text-xs text-slate-400">{task.duration}</td>
+                <td className="px-5 py-4 font-mono text-xs text-slate-400">{Number(task.estimatedHours ?? 0) / 8} Gün</td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-1.5 font-mono text-xs text-slate-400">
-                    <Users className="h-3.5 w-3.5 text-cyan-500/70" /> {task.team} Personel
+                    <Users className="h-3.5 w-3.5 text-cyan-500/70" /> {task.assignedUsers?.length ?? 0} Personel
                   </div>
                 </td>
-                <td className="px-5 py-4 font-mono text-xs text-slate-500">{task.deps}</td>
+                <td className="px-5 py-4 font-mono text-xs text-slate-500">{task.dependencies?.map(({ predecessor }) => predecessor.name).join(', ') || '-'}</td>
               </tr>
             ))}
           </tbody>

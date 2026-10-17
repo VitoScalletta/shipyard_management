@@ -1,13 +1,20 @@
-import { Controller, Get, Post, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { ProjectContextService } from './project-context.service';
 import { AiAnalysisService } from './ai-analysis.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('ai-context')
+@UseGuards(JwtAuthGuard)
 export class AiContextController {
   constructor(
     private readonly projectContextService: ProjectContextService,
     private readonly aiAnalysisService: AiAnalysisService,
   ) {}
+
+  @Get('projects/:projectId/latest')
+  async getLatestAnalysis(@Param('projectId') projectId: string) {
+    return this.aiAnalysisService.getLatestAnalysis(projectId);
+  }
 
   @Get('test/:projectId')
   async testContext(@Param('projectId') projectId: string) {

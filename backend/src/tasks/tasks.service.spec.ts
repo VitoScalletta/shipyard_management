@@ -113,6 +113,27 @@ describe('TasksService', () => {
       expect(result).toEqual(expectedTask);
       expect(mockTaskRepository.save).toHaveBeenCalledWith(expectedTask);
     });
+
+    it('görev oluştururken atanmış kullanıcı ilişkilerini kaydetmelidir', async () => {
+      const expectedTask = { id: 'task-id' };
+      mockTaskRepository.create.mockReturnValue(expectedTask);
+      mockTaskRepository.save.mockResolvedValue(expectedTask);
+
+      await service.create({
+        projectId: 'project-id',
+        shipId: 'ship-id',
+        name: 'Personel atanmış görev',
+        assignedUserIds: ['user-id'],
+      } as any);
+
+      expect(mockTaskRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assignedUsers: [{ id: 'user-id' }],
+          project: { id: 'project-id' },
+          ship: { id: 'ship-id' },
+        }),
+      );
+    });
   });
 
   describe('addDependency', () => {

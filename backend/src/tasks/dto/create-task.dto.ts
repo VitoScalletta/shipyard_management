@@ -1,6 +1,7 @@
 import {
   IsDate,
   IsDateString,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -42,6 +43,10 @@ export class CreateTaskDto {
 
   @IsNumber()
   @IsOptional()
+  actualHours?: number;
+
+  @IsNumber()
+  @IsOptional()
   quantity?: number;
 
   @IsEnum(MeasurementUnit)
@@ -59,4 +64,9 @@ export class CreateTaskDto {
   @IsUUID()
   @IsOptional()
   shipAreaId?: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  assignedUserIds?: string[];
 }

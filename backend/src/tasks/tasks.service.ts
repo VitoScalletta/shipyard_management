@@ -201,6 +201,7 @@ export class TasksService {
   }
 
   async create(createTaskDto: CreateTaskDto) {
+    const { assignedUserIds, ...taskData } = createTaskDto;
     this.validateTaskDateAndMetrics(
       createTaskDto.startDate ? new Date(createTaskDto.startDate) : undefined,
       createTaskDto.plannedEndDate
@@ -211,14 +212,17 @@ export class TasksService {
     );
 
     const task = this.taskRepository.create({
-      ...createTaskDto,
+      ...taskData,
       project: { id: createTaskDto.projectId },
       ship: { id: createTaskDto.shipId },
       shipArea: createTaskDto.shipAreaId
         ? { id: createTaskDto.shipAreaId }
         : undefined,
+      assignedUsers: assignedUserIds?.map((id) => ({ id })),
     });
-    return this.taskRepository.save(task);
+    const savedTask = await this.taskRepository.save(task);
+    this.eventEmitter.emit('task.updated', { projectId: createTaskDto.projectId });
+    return savedTask;
   }
 
   async findAll() {
@@ -228,7 +232,15 @@ export class TasksService {
         ship: true,
         shipArea: true,
         assignedUsers: true,
+        resources: { resource: true },
       },
+    });
+  }
+
+  async findDependenciesByProject(projectId: string) {
+    return this.taskDependencyRepository.find({
+      where: { predecessor: { project: { id: projectId } } },
+      relations: { predecessor: true, successor: true },
     });
   }
 

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ship, Activity, Clock, Plus, Anchor, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 import { api } from '@/lib/api';
-import { toast } from 'sonner';
+import NewProjectModal from './NewProjectModal';
 
 export interface ShipProject {
   id: string;
@@ -17,63 +17,41 @@ export interface ShipProject {
   dueDate: string;
 }
 
-// Backend kapalıysa devreye girecek Yedek Tohum Verisi (Fallback)
-const FALLBACK_FLEET: ShipProject[] = [
-  {
-    id: 'PRJ-084',
-    name: 'M/V YILDIZ KURU YÜK',
-    type: '120m Kuru Yük',
-    status: 'DELAYED',
-    progress: 74,
-    health: 'CRITICAL',
-    manager: 'Kpt. Demir',
-    dueDate: '2026-12-15'
-  },
-  {
-    id: 'PRJ-091',
-    name: 'M/T KARADENİZ TANKER',
-    type: 'Kimyasal Tanker',
-    status: 'ON_TRACK',
-    progress: 45,
-    health: 'GOOD',
-    manager: 'Ahmet Usta',
-    dueDate: '2027-03-20'
-  },
-  {
-    id: 'PRJ-095',
-    name: 'T/B FIRTINA RÖMORKÖR',
-    type: 'Liman Römorkörü',
-    status: 'MAINTENANCE',
-    progress: 12,
-    health: 'WARNING',
-    manager: 'Ayşe Müh.',
-    dueDate: '2026-11-05'
-  }
-];
-
 export default function FleetDashboard() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [projects, setProjects] = useState<ShipProject[]>([]);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setIsLoading(true);
-        // GERÇEK VERİTABANI İSTEĞİ
-        const response = await api.get('/projects');
-        setProjects(response.data);
-      } catch (error) {
-        console.warn('Backend API erişilemedi, yerel sunum verisi yükleniyor...', error);
-        toast.info('Sunucu bağlantısı bekleniyor: Demo verileri yüklendi.');
-        setProjects(FALLBACK_FLEET);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProjects();
+  const fetchProjects = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      const response = await api.get('/projects');
+      setProjects(
+        response.data.map((project: any) => ({
+            id: project.id,
+            name: project.name,
+            type: project.type,
+            status: project.status === 'COMPLETED' ? 'ON_TRACK' : project.type === 'MAINTENANCE' ? 'MAINTENANCE' : 'DELAYED',
+            progress: Number(project.progressPercentage ?? 0),
+            health: project.priority === 'CRITICAL' ? 'CRITICAL' : project.priority === 'HIGH' ? 'WARNING' : 'GOOD',
+            manager: project.managerId ?? 'Atanmadı',
+            dueDate: project.plannedDeliveryDate ? new Date(project.plannedDeliveryDate).toLocaleDateString('tr-TR') : '-',
+        })),
+      );
+    } catch (error) {
+      console.error('Projeler yüklenemedi:', error);
+      setLoadError('Projeler backend’den yüklenemedi. API bağlantısını ve oturumunuzu kontrol edin.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-hidden">
@@ -88,7 +66,7 @@ export default function FleetDashboard() {
             <p className="font-mono text-sm text-slate-500">KIZAK VE HAVUZLARDAKİ GEMİLER</p>
           </div>
         </div>
-        <button className="flex items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 py-2 font-sans text-sm font-bold text-white transition-all hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+        <button onClick={() => setIsNewProjectOpen(true)} className="flex items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 py-2 font-sans text-sm font-bold text-white transition-all hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
           <Plus className="h-4 w-4" /> YENİ GEMİ EKLE
         </button>
       </div>
@@ -116,13 +94,8 @@ export default function FleetDashboard() {
           </div>
         )}
 
-        {!isLoading && projects.length === 0 && (
-          <EmptyState
-            icon={Ship}
-            title="Tersanede Gemi Bulunmuyor"
-            description="Şu anda kızakta veya havuzda kayıtlı aktif bir gemi projesi yok. Yeni bir gemi ekleyerek operasyona başlayın."
-          />
-        )}
+        {!isLoading && loadError && <EmptyState icon={Ship} title="Projeler yüklenemedi" description={loadError} />}
+        {!isLoading && !loadError && projects.length === 0 && <EmptyState icon={Ship} title="Tersanede Gemi Bulunmuyor" description="Şu anda veritabanında proje kaydı yok. Yeni bir gemi ekleyerek operasyona başlayın." />}
 
         {!isLoading && projects.length > 0 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -134,16 +107,19 @@ export default function FleetDashboard() {
               >
                 <div className="flex items-start justify-between border-b border-slate-800/60 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${
-                      ship.health === 'CRITICAL' ? 'bg-rose-950/50 border-rose-500/30 text-rose-500' :
-                      ship.health === 'WARNING' ? 'bg-amber-950/50 border-amber-500/30 text-amber-500' :
-                      'bg-cyan-950/50 border-cyan-500/30 text-cyan-500'
-                    }`}>
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${
+                        ship.health === 'CRITICAL' ? 'bg-rose-950/50 border-rose-500/30 text-rose-500' : ship.health === 'WARNING' ? 'bg-amber-950/50 border-amber-500/30 text-amber-500' : 'bg-cyan-950/50 border-cyan-500/30 text-cyan-500'
+                      }`}
+                    >
                       <Ship className="h-5 w-5" />
                     </div>
+                    <NewProjectModal isOpen={isNewProjectOpen} onClose={() => setIsNewProjectOpen(false)} onCreated={fetchProjects} />
                     <div className="flex flex-col">
                       <h3 className="font-sans text-lg font-bold text-slate-100 group-hover:text-cyan-400 transition-colors">{ship.name}</h3>
-                      <span className="font-mono text-xs text-slate-500">{ship.type} • {ship.id}</span>
+                      <span className="font-mono text-xs text-slate-500">
+                        {ship.type} • {ship.id}
+                      </span>
                     </div>
                   </div>
                   {ship.health === 'CRITICAL' && <AlertTriangle className="h-5 w-5 animate-pulse text-rose-500" />}
@@ -155,10 +131,7 @@ export default function FleetDashboard() {
                     <span className="font-bold text-cyan-400">%{ship.progress}</span>
                   </div>
                   <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-950 border border-slate-800">
-                    <div
-                      className={`h-full ${ship.health === 'CRITICAL' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : 'bg-cyan-500'}`}
-                      style={{ width: `${ship.progress}%` }}
-                    />
+                    <div className={`h-full ${ship.health === 'CRITICAL' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : 'bg-cyan-500'}`} style={{ width: `${ship.progress}%` }} />
                   </div>
                 </div>
 

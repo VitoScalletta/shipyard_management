@@ -64,26 +64,52 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges };
 };
 
-const initialNodes: Node[] = [
-  { id: '1', type: 'taskNode', position: { x: 0, y: 0 }, data: { label: 'Yüzey Hazırlığı & Kumlama', status: 'COMPLETED', duration: '3 Gün', team: 4, isCritical: true } },
-  { id: '2', type: 'taskNode', position: { x: 0, y: 0 }, data: { label: 'Astar Boya Uygulaması', status: 'IN_PROGRESS', duration: '2 Gün', team: 2, isCritical: true } },
-  { id: '3', type: 'taskNode', position: { x: 0, y: 0 }, data: { label: 'Pervane Şaft İncelemesi', status: 'DELAYED', duration: '5 Gün', team: 3, isCritical: false } },
-  { id: '4', type: 'taskNode', position: { x: 0, y: 0 }, data: { label: 'Ana Katman Epoksi', status: 'BLOCKED', duration: '4 Gün', team: 5, isCritical: true } },
-  { id: '5', type: 'taskNode', position: { x: 0, y: 0 }, data: { label: 'Kalite Kontrol (Boya)', status: 'PENDING', duration: '1 Gün', team: 1, isCritical: true } },
-];
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', animated: true, style: { stroke: '#f43f5e', strokeWidth: 3 } },
-  { id: 'e1-3', source: '1', target: '3', animated: false, style: { stroke: '#475569', strokeWidth: 2 } },
-  { id: 'e2-4', source: '2', target: '4', animated: true, style: { stroke: '#f43f5e', strokeWidth: 3 } },
-  { id: 'e4-5', source: '4', target: '5', animated: true, style: { stroke: '#f43f5e', strokeWidth: 3, strokeDasharray: '5,5' } },
-];
-const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
-
 // YENİ: 3. İÇ KAMERA BİLEŞENİ (ReactFlowProvider sarmalaması gerektiği için)
-function FlowContent({ focusedNodeId }: { focusedNodeId: string | null }) {
+type TaskNodeData = {
+  id: string;
+  name: string;
+  status: string;
+  estimatedHours?: number;
+  assignedUsers?: { id: string }[];
+  isCritical?: boolean;
+};
+
+function FlowContent({
+  focusedNodeId,
+  tasks,
+  dependencies,
+  onTaskUpdated,
+}: {
+  focusedNodeId: string | null;
+  tasks: TaskNodeData[];
+  dependencies: { predecessor: { id: string }; successor: { id: string } }[];
+  onTaskUpdated: () => void;
+}) {
   const nodeTypes = useMemo(() => ({ taskNode: TaskNode }), []);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const { setCenter } = useReactFlow(); // Kamera kontrol motoru
+  const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
+    const nodes: Node[] = tasks.map((task) => ({
+      id: task.id,
+      type: 'taskNode',
+      position: { x: 0, y: 0 },
+      data: {
+        label: task.name,
+        status: task.status,
+        duration: `${Number(task.estimatedHours ?? 0) / 8} Gün`,
+        team: task.assignedUsers?.length ?? 0,
+        isCritical: task.isCritical ?? false,
+      },
+    }));
+    const edges: Edge[] = dependencies.map(({ predecessor, successor }) => ({
+      id: `${predecessor.id}-${successor.id}`,
+      source: predecessor.id,
+      target: successor.id,
+      animated: true,
+      style: { stroke: '#475569', strokeWidth: 2 },
+    }));
+    return getLayoutedElements(nodes, edges);
+  }, [tasks, dependencies]);
 
   // Kamera Hareketi Efekti
   useEffect(() => {
@@ -99,8 +125,17 @@ function FlowContent({ focusedNodeId }: { focusedNodeId: string | null }) {
   }, [focusedNodeId, setCenter]);
 
   const onNodeClick = useCallback((_: any, node: Node) => {
-    setSelectedTask(node.data);
-  }, []);
+    const task = tasks.find(({ id }) => id === node.id);
+    if (task) {
+      setSelectedTask({
+        ...node.data,
+        ...task,
+        label: task.name,
+        duration: `${Number(task.estimatedHours ?? 0) / 8} Gün`,
+        team: task.assignedUsers?.length ?? 0,
+      });
+    }
+  }, [tasks]);
 
   return (
     <>
@@ -111,17 +146,27 @@ function FlowContent({ focusedNodeId }: { focusedNodeId: string | null }) {
         <Background gap={40} color="#1e293b" size={1.5} />
         <Controls className="overflow-hidden rounded-md border border-slate-800 !bg-slate-900 shadow-[0_0_15px_rgba(0,0,0,0.5)] [&_button]:!border-b [&_button]:!border-slate-800 [&_button]:!bg-slate-900 [&_button]:!fill-slate-400 hover:[&_button]:!bg-slate-800 hover:[&_button]:!fill-cyan-400 last:[&_button]:!border-none" />
       </ReactFlow>
-      <TaskDetailDrawer isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} />
+      <TaskDetailDrawer isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onTaskUpdated={onTaskUpdated} />
     </>
   );
 }
 
 // 4. DIŞA AKTARILAN ANA BİLEŞEN
-export default function CriticalPathGraph({ focusedNodeId }: { focusedNodeId: string | null }) {
+export default function CriticalPathGraph({
+  focusedNodeId,
+  tasks,
+  dependencies,
+  onTaskUpdated,
+}: {
+  focusedNodeId: string | null;
+  tasks: TaskNodeData[];
+  dependencies: { predecessor: { id: string }; successor: { id: string } }[];
+  onTaskUpdated: () => void;
+}) {
   return (
     <div className="h-full w-full">
       <ReactFlowProvider>
-        <FlowContent focusedNodeId={focusedNodeId} />
+        <FlowContent focusedNodeId={focusedNodeId} tasks={tasks} dependencies={dependencies} onTaskUpdated={onTaskUpdated} />
       </ReactFlowProvider>
     </div>
   );

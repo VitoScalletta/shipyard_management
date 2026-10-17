@@ -19,7 +19,9 @@ export class WorkforceService {
   }
 
   async findAllEmployess(): Promise<Employee[]> {
-    return await this.employeeRepository.find({ relations: { team: true } });
+    return await this.employeeRepository.find({
+      relations: { team: true, user: true },
+    });
   }
 
   async findOneEmployee(id: string): Promise<Employee> {

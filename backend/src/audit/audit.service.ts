@@ -42,4 +42,11 @@ export class AuditService {
       this.logger.error(`Audit Log yazılamadı: ${error.message}`, error.stack);
     }
   }
+
+  async findRecent(limit = 100): Promise<AuditLog[]> {
+    return this.auditLogRepository.find({
+      order: { timeStamp: 'DESC' },
+      take: Math.min(Math.max(limit, 1), 500),
+    });
+  }
 }

@@ -13,7 +13,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: User, token: string) => void;
+  setAuth: (user: User, token: string, refreshToken?: string) => void;
   logout: () => void;
 }
 
@@ -24,8 +24,11 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
 
-      setAuth: (user, token) => {
+      setAuth: (user, token, refreshToken) => {
         localStorage.setItem('access_token', token);
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken);
+        }
         set({ user, token, isAuthenticated: true });
       },
 
@@ -38,6 +41,6 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'tactical-auth-storage',
-    }
-  )
+    },
+  ),
 );

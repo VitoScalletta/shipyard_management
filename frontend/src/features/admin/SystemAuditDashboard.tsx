@@ -1,30 +1,55 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Server, Activity, BrainCircuit, ThumbsUp,
   Clock, ShieldCheck, Database, Filter, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// Sahte (Mock) Telemetri Verileri
-const MOCK_TELEMETRY = {
-  systemStatus: 'ONLINE',
-  dbLatency: '24ms',
-  aiEngine: { status: 'ACTIVE', model: 'Qwen2.5:3b', vram: '3.2 GB / 8.0 GB' },
-  aiMetrics: { totalQueries: 1245, avgResponseTime: '1.2s', satisfaction: 88 },
-};
-
-// Sahte (Mock) Denetim İzi (Audit Log) Verileri
-const MOCK_AUDIT_LOGS = [
-  { id: 'LOG-001', time: '10:45:22', date: '2026-10-16', user: 'Ahmet Yılmaz', role: 'MANAGER', action: 'GÖREV_GÜNCELLENDİ', target: 'TSK-104', oldVal: 'Süre: 3 Gün', newVal: 'Süre: 5 Gün', type: 'USER' },
-  { id: 'LOG-002', time: '10:30:15', date: '2026-10-16', user: 'Garson AI', role: 'SYSTEM_AI', action: 'DURUM_DEĞİŞİMİ', target: 'TSK-107', oldVal: 'Durum: PENDING', newVal: 'Durum: BLOCKED', type: 'AI' },
-  { id: 'LOG-003', time: '09:15:00', date: '2026-10-16', user: 'Mehmet Demir', role: 'WORKER', action: 'SÜRE_GİRİŞİ', target: 'TSK-104', oldVal: 'Kayıt: 0 Saat', newVal: 'Kayıt: 3 Saat', type: 'USER' },
-  { id: 'LOG-004', time: '08:00:05', date: '2026-10-16', user: 'Sistem', role: 'CRON', action: 'GÜNLÜK_YEDEKLEME', target: 'DB_MAIN', oldVal: '-', newVal: 'Başarılı (450MB)', type: 'SYSTEM' },
-];
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 export default function SystemAuditDashboard() {
   const [filter, setFilter] = useState('ALL');
+  const [logs, setLogs] = useState<any[]>([]);
+  const [apiStatus, setApiStatus] = useState('KONTROL EDİLİYOR');
+  const [databaseStatus, setDatabaseStatus] = useState('KONTROL EDİLİYOR');
+  const [aiStatus, setAiStatus] = useState('BİLGİ YOK');
 
-  const filteredLogs = MOCK_AUDIT_LOGS.filter(log => filter === 'ALL' || log.type === filter);
+  useEffect(() => {
+    api.get('/audit?limit=100')
+      .then(({ data }) => setLogs(data.map((log: any) => ({
+        ...log,
+        time: new Date(log.timeStamp).toLocaleTimeString('tr-TR'),
+        date: new Date(log.timeStamp).toLocaleDateString('tr-TR'),
+        user: log.userEmail ?? log.userId ?? 'Sistem',
+        role: '-',
+        action: log.action,
+        target: `${log.entityName}:${log.entityId}`,
+        oldVal: log.oldValues ? JSON.stringify(log.oldValues) : '-',
+        newVal: log.newValues ? JSON.stringify(log.newValues) : '-',
+        type: log.userId ? 'USER' : 'SYSTEM',
+      }))))
+      .catch((error) => {
+        console.error('Denetim kayıtları yüklenemedi:', error);
+        toast.error('Denetim kayıtları yüklenemedi. Admin yetkinizi kontrol edin.');
+      });
+
+    api.get('/health/liveness')
+      .then(() => setApiStatus('ONLINE'))
+      .catch(() => setApiStatus('OFFLINE'));
+    api.get('/health/readiness')
+      .then(({ data }) => {
+        setDatabaseStatus(data?.details?.database?.status === 'up' ? 'BAĞLI' : 'ERİŞİLEMİYOR');
+        setAiStatus(data?.details?.ollama?.status === 'up' ? 'AKTİF' : 'KAPALI');
+      })
+      .catch((error) => {
+        const details = error.response?.data?.details;
+        const database = details?.database?.status;
+        setDatabaseStatus(database === 'up' ? 'BAĞLI' : 'ERİŞİLEMİYOR');
+        setAiStatus(details?.ollama?.status === 'up' ? 'AKTİF' : 'KAPALI');
+      });
+  }, []);
+
+  const filteredLogs = logs.filter(log => filter === 'ALL' || log.type === filter);
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-hidden">
@@ -52,8 +77,8 @@ export default function SystemAuditDashboard() {
             <span className="font-sans text-xs font-bold uppercase tracking-wider">Core API & DB</span>
           </div>
           <div className="mt-3 flex items-end justify-between">
-            <span className="font-mono text-2xl font-bold text-emerald-400">ONLINE</span>
-            <span className="font-mono text-xs text-emerald-500/70">Gecikme: {MOCK_TELEMETRY.dbLatency}</span>
+            <span className="font-mono text-2xl font-bold text-emerald-400">{apiStatus}</span>
+            <span className="font-mono text-xs text-emerald-500/70">Veritabanı: {databaseStatus}</span>
           </div>
         </div>
 
@@ -65,11 +90,11 @@ export default function SystemAuditDashboard() {
           </div>
           <div className="mt-3 flex items-end justify-between">
             <div className="flex flex-col">
-              <span className="font-mono text-xl font-bold text-cyan-400">{MOCK_TELEMETRY.aiEngine.model}</span>
-              <span className="font-mono text-[10px] text-cyan-500/70">VRAM: {MOCK_TELEMETRY.aiEngine.vram}</span>
+              <span className="font-mono text-xl font-bold text-cyan-400">Ollama</span>
+              <span className="font-mono text-[10px] text-cyan-500/70">Model bilgisi health API’sinde yok</span>
             </div>
             <span className="flex items-center gap-1 rounded bg-cyan-950/50 px-2 py-1 font-mono text-[10px] text-cyan-400 border border-cyan-500/30">
-              <Activity className="h-3 w-3" /> ACTIVE
+              <Activity className="h-3 w-3" /> {aiStatus}
             </span>
           </div>
         </div>
@@ -82,12 +107,12 @@ export default function SystemAuditDashboard() {
           </div>
           <div className="mt-3 flex items-end justify-between">
             <div className="flex flex-col">
-              <span className="font-mono text-xl font-bold text-slate-200">{MOCK_TELEMETRY.aiMetrics.avgResponseTime}</span>
-              <span className="font-mono text-[10px] text-slate-500">Ortalama Yanıt Hızı</span>
+              <span className="font-mono text-xl font-bold text-slate-200">—</span>
+              <span className="font-mono text-[10px] text-slate-500">Metrik API’si mevcut değil</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="font-mono text-lg font-bold text-slate-300">{MOCK_TELEMETRY.aiMetrics.totalQueries}</span>
-              <span className="font-mono text-[10px] text-slate-500">Toplam Sorgu</span>
+              <span className="font-mono text-lg font-bold text-slate-300">—</span>
+              <span className="font-mono text-[10px] text-slate-500">Toplam sorgu</span>
             </div>
           </div>
         </div>
@@ -100,9 +125,9 @@ export default function SystemAuditDashboard() {
           </div>
           <div className="mt-3 flex items-center gap-4">
             <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full bg-emerald-500" style={{ width: `${MOCK_TELEMETRY.aiMetrics.satisfaction}%` }} />
+              <div className="h-full bg-slate-600" style={{ width: '0%' }} />
             </div>
-            <span className="font-mono text-2xl font-bold text-emerald-400">%{MOCK_TELEMETRY.aiMetrics.satisfaction}</span>
+            <span className="font-mono text-2xl font-bold text-slate-400">—</span>
           </div>
         </div>
 

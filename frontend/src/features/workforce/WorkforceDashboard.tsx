@@ -1,33 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Users, Wrench, AlertTriangle, CheckCircle2, HardHat,
-  Activity, Plus, UserPlus, ClipboardList, PackagePlus, X, Save
+  Users, Wrench, HardHat, Plus, UserPlus, PackagePlus, X, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-
-// Sahte (Mock) Veriler
-const MOCK_TEAMS = [
-  { id: 'T1', name: 'Boya ve Kumlama Ekibi', dept: 'Yüzey İşlem', workers: 12, capacity: 140, status: 'OVERLOADED', skills: ['Epoksi', 'Kumlama', 'Astar'] },
-  { id: 'T2', name: 'Kaynak Takımı A', dept: 'Çelik Konstrüksiyon', workers: 8, capacity: 85, status: 'OPTIMAL', skills: ['TIG', 'MIG/MAG', 'Argon'] },
-  { id: 'T3', name: 'Elektrik & Donatım', dept: 'Kablolama', workers: 6, capacity: 45, status: 'AVAILABLE', skills: ['Yüksek Gerilim', 'Pano Montaj'] },
-];
-
-const MOCK_RESOURCES = [
-  { id: 'R1', name: 'Kule Vinç (Vinç-04)', type: 'Ağır Makine', status: 'IN_USE', project: 'TITAN DISCOVERY', condition: 'İyi' },
-  { id: 'R2', name: 'Yüksek Basınçlı Kompresör', type: 'Ekipman', status: 'AVAILABLE', project: '-', condition: 'Bakım Yaklaşıyor' },
-  { id: 'R3', name: 'Mobil İskele Sistemi', type: 'Demirbaş', status: 'MAINTENANCE', project: '-', condition: 'Arızalı' },
-  { id: 'R4', name: 'Jotun Astar Boya (Varil)', type: 'Sarf Malzeme', status: 'LOW_STOCK', project: '-', condition: 'Kritik Seviye: 2 Varil' },
-];
+import { api } from '@/lib/api';
 
 export default function WorkforceDashboard() {
   const [activeTab, setActiveTab] = useState<'TEAMS' | 'RESOURCES'>('TEAMS');
-  const [modalType, setModalType] = useState<'TEAM' | 'WORKER' | 'TASK' | 'EQUIPMENT' | null>(null);
+  const [modalType, setModalType] = useState<'TEAM' | 'WORKER' | 'EQUIPMENT' | null>(null);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const loadData = async () => {
+    try {
+      const [teamsResponse, resourcesResponse] = await Promise.all([
+        api.get('/workforce/teams'),
+        api.get('/resources'),
+      ]);
+      setTeams(teamsResponse.data.map((team: any) => ({
+        id: team.id,
+        name: team.name,
+        dept: team.department,
+        workers: team.members?.length ?? 0,
+        capacity: Number(team.capacity ?? 0),
+      })));
+      setResources(resourcesResponse.data.map((resource: any) => ({
+        ...resource,
+        condition: `${resource.availableQuantity}/${resource.totalQuantity} ${resource.unit}`,
+      })));
+    } catch (error) {
+      toast.error('Ekip ve kaynak verileri yüklenemedi.');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setModalType(null);
-    toast.success('Kayıt başarıyla sisteme eklendi!');
+    const values = new FormData(e.currentTarget);
+    setIsSaving(true);
+    try {
+      if (modalType === 'TEAM') {
+        await api.post('/workforce/teams', {
+          name: values.get('name'),
+          department: values.get('department'),
+          capacity: Number(values.get('capacity') || 0),
+        });
+      } else if (modalType === 'EQUIPMENT') {
+        const quantity = Number(values.get('quantity'));
+        await api.post('/resources', {
+          name: values.get('name'),
+          type: values.get('type'),
+          status: 'AVAILABLE',
+          totalQuantity: quantity,
+          availableQuantity: quantity,
+          unit: values.get('unit'),
+        });
+      } else if (modalType === 'WORKER') {
+        const { data: tokens } = await api.post('/auth/register', {
+          email: values.get('email'),
+          password: values.get('password'),
+          firstName: values.get('firstName'),
+          lastName: values.get('lastName'),
+        });
+        const { data: user } = await api.get('/auth/me', {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        await api.post('/workforce/employees', {
+          user: { id: user.id },
+          department: values.get('department'),
+          team: values.get('teamId') ? { id: values.get('teamId') } : undefined,
+          jobPosition: values.get('jobPosition'),
+        });
+      }
+      toast.success('Kayıt başarıyla sisteme eklendi.');
+      setModalType(null);
+      await loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? 'Kayıt oluşturulamadı.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -72,9 +129,6 @@ export default function WorkforceDashboard() {
             <button onClick={() => setModalType('WORKER')} className="flex items-center gap-2 rounded-md bg-slate-800 border border-slate-700 px-4 py-2 font-sans text-xs font-bold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white">
               <UserPlus className="h-4 w-4" /> PERSONEL EKLE & ATA
             </button>
-            <button onClick={() => setModalType('TASK')} className="flex items-center gap-2 rounded-md bg-slate-800 border border-slate-700 px-4 py-2 font-sans text-xs font-bold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white">
-              <ClipboardList className="h-4 w-4" /> GÖREV ATA
-            </button>
           </>
         ) : (
           <button onClick={() => setModalType('EQUIPMENT')} className="flex items-center gap-2 rounded-md bg-emerald-950/40 border border-emerald-500/30 px-4 py-2 font-sans text-xs font-bold text-emerald-400 transition-colors hover:bg-emerald-900">
@@ -90,8 +144,8 @@ export default function WorkforceDashboard() {
           {/* SEKME 1: EKİPLER VE KAPASİTE */}
           {activeTab === 'TEAMS' && (
             <motion.div key="teams" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {MOCK_TEAMS.map(team => (
-                <div key={team.id} className={`flex flex-col gap-4 rounded-lg border bg-slate-900/50 p-5 ${team.status === 'OVERLOADED' ? 'border-rose-500/30' : 'border-slate-800'}`}>
+              {teams.map(team => (
+                <div key={team.id} className="flex flex-col gap-4 rounded-lg border border-slate-800 bg-slate-900/50 p-5">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-sans text-lg font-bold text-slate-200">{team.name}</h3>
@@ -102,25 +156,8 @@ export default function WorkforceDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between font-mono text-xs">
-                      <span className="text-slate-400">Günlük Yük: %{team.capacity}</span>
-                      {team.status === 'OVERLOADED' && <span className="flex items-center gap-1 text-rose-500"><AlertTriangle className="h-3 w-3" /> AŞIRI YÜK</span>}
-                      {team.status === 'OPTIMAL' && <span className="flex items-center gap-1 text-emerald-500"><CheckCircle2 className="h-3 w-3" /> OPTİMAL</span>}
-                      {team.status === 'AVAILABLE' && <span className="flex items-center gap-1 text-cyan-500"><Activity className="h-3 w-3" /> MÜSAİT</span>}
-                    </div>
-                    <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className={`h-full ${team.capacity > 100 ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : team.capacity > 70 ? 'bg-emerald-500' : 'bg-cyan-500'}`}
-                        style={{ width: `${Math.min(team.capacity, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-800/50 pt-3">
-                    {team.skills.map(skill => (
-                      <span key={skill} className="rounded border border-slate-700 bg-slate-800/50 px-2 py-1 font-sans text-[10px] text-slate-300">{skill}</span>
-                    ))}
+                  <div className="border-t border-slate-800/50 pt-3 font-mono text-xs text-slate-400">
+                    Kapasite: <span className="text-slate-200">{team.capacity}</span>
                   </div>
                 </div>
               ))}
@@ -130,7 +167,7 @@ export default function WorkforceDashboard() {
           {/* SEKME 2: EKİPMAN VE MALZEME HAVUZU */}
           {activeTab === 'RESOURCES' && (
             <motion.div key="resources" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {MOCK_RESOURCES.map(res => (
+              {resources.map(res => (
                 <div key={res.id} className="flex flex-col justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-4">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-start justify-between">
@@ -138,13 +175,11 @@ export default function WorkforceDashboard() {
                       {res.status === 'IN_USE' && <span className="rounded bg-cyan-950/50 border border-cyan-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-cyan-400">KULLANIMDA</span>}
                       {res.status === 'AVAILABLE' && <span className="rounded bg-emerald-950/50 border border-emerald-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">MÜSAİT</span>}
                       {res.status === 'MAINTENANCE' && <span className="rounded bg-rose-950/50 border border-rose-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-rose-400 animate-pulse">BAKIMDA</span>}
-                      {res.status === 'LOW_STOCK' && <span className="rounded bg-amber-950/50 border border-amber-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-amber-400">AZALDI</span>}
                     </div>
                     <h3 className="font-sans text-sm font-bold text-slate-200 leading-tight">{res.name}</h3>
                   </div>
                   <div className="mt-4 flex flex-col gap-1.5 border-t border-slate-800/50 pt-3 font-mono text-xs">
-                    <div className="flex justify-between text-slate-400"><span>Proje:</span> <span className="text-slate-300">{res.project}</span></div>
-                    <div className="flex justify-between text-slate-400"><span>Durum:</span> <span className={res.status === 'MAINTENANCE' || res.status === 'LOW_STOCK' ? 'text-amber-500' : 'text-slate-300'}>{res.condition}</span></div>
+                    <div className="flex justify-between text-slate-400"><span>Stok:</span> <span className={res.status === 'MAINTENANCE' || res.status === 'DEPLETED' ? 'text-amber-500' : 'text-slate-300'}>{res.condition}</span></div>
                   </div>
                 </div>
               ))}
@@ -167,7 +202,6 @@ export default function WorkforceDashboard() {
                 <h2 className="font-sans text-lg font-bold text-slate-100">
                   {modalType === 'TEAM' && 'Yeni Takım Oluştur'}
                   {modalType === 'WORKER' && 'Personel Ekle ve Takıma Ata'}
-                  {modalType === 'TASK' && 'Takıma / Personele Görev Ata'}
                   {modalType === 'EQUIPMENT' && 'Yeni Ekipman / Malzeme Ekle'}
                 </h2>
                 <button onClick={() => setModalType(null)} className="text-slate-400 hover:text-slate-200"><X className="h-5 w-5" /></button>
@@ -178,52 +212,58 @@ export default function WorkforceDashboard() {
                {/* PERSONEL EKLEME FORMU */}
                 {modalType === 'WORKER' && (
                   <>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-mono text-xs text-slate-400">Ad Soyad</label>
-                      <input required type="text" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="Örn: Ahmet Usta" />
-                    </div>
+                    <input required name="firstName" placeholder="Ad" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
+                    <input required name="lastName" placeholder="Soyad" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
+                    <input required type="email" name="email" placeholder="E-posta" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
+                    <input required minLength={6} type="password" name="password" placeholder="Geçici şifre (en az 6 karakter)" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
+                    <input required name="jobPosition" placeholder="Görev unvanı" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
                     <div className="flex flex-col gap-1.5">
                       <label className="font-mono text-xs text-slate-400">Atanacak Takım</label>
-                      <select required className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none">
-                        <option value="">Takım Seçin...</option>
-                        {MOCK_TEAMS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      <select name="teamId" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none">
+                        <option value="">Takım seçmeyin</option>
+                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </div>
+                    <select required name="department" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200">
+                      <option value="PAINTING">Boya</option><option value="WELDING">Kaynak</option><option value="ELECTRICAL">Elektrik</option><option value="MECHANICAL">Mekanik</option><option value="ASSEMBLY">Montaj</option><option value="LOGISTICS">Lojistik</option>
+                    </select>
                   </>
                 )}
 
                 {/* ORTAK İSİM/BAŞLIK ALANI (Takım, Ekipman ve Görev için) */}
-                {(modalType === 'TEAM' || modalType === 'EQUIPMENT' || modalType === 'TASK') && (
+                {(modalType === 'TEAM' || modalType === 'EQUIPMENT') && (
                   <div className="flex flex-col gap-1.5">
                     <label className="font-mono text-xs text-slate-400">
-                      {modalType === 'TASK' ? 'Görev Başlığı' : 'İsim / Başlık'}
+                      İsim / Başlık
                     </label>
-                    <input required type="text" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="Buraya yazın..." />
+                    <input required name="name" type="text" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="Buraya yazın..." />
                   </div>
                 )}
 
-                {/* SADECE GÖREV ATAMAYA ÖZEL HEDEF SEÇİCİ */}
-                {modalType === 'TASK' && (
+                {modalType === 'TEAM' && (
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-xs text-slate-400">Hedef (Kime Atanacak?)</label>
-                    <select required className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none scrollbar-thin">
-                      <option value="">Seçim Yapın...</option>
-                      <optgroup label="Tüm Takımlar" className="bg-slate-900 text-cyan-400 font-bold">
-                        {MOCK_TEAMS.map(t => <option key={t.id} className="text-slate-200 font-normal" value={t.id}>{t.name}</option>)}
-                      </optgroup>
-                      <optgroup label="Bireysel Personel" className="bg-slate-900 text-emerald-400 font-bold mt-2">
-                        <option value="W1" className="text-slate-200 font-normal">Ahmet Usta (Boya)</option>
-                        <option value="W2" className="text-slate-200 font-normal">Mehmet Demir (Kaynak)</option>
-                      </optgroup>
+                    <label className="font-mono text-xs text-slate-400">Departman</label>
+                    <select required name="department" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200">
+                      <option value="PAINTING">Boya</option><option value="WELDING">Kaynak</option><option value="ELECTRICAL">Elektrik</option><option value="MECHANICAL">Mekanik</option><option value="ASSEMBLY">Montaj</option><option value="LOGISTICS">Lojistik</option>
                     </select>
+                    <label className="font-mono text-xs text-slate-400">Kapasite</label>
+                    <input required min="0" type="number" name="capacity" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
+                  </div>
+                )}
+
+                {modalType === 'EQUIPMENT' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <select name="type" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200"><option value="EQUIPMENT">Ekipman</option><option value="MACHINE">Makine</option><option value="TOOl">El aleti</option><option value="MATERIAL">Malzeme</option></select>
+                    <input required min="0" type="number" step="0.01" name="quantity" placeholder="Miktar" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
+                    <select name="unit" className="col-span-2 rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200"><option value="adet">Adet</option><option value="kg">kg</option><option value="m">Metre</option><option value="m²">Metrekare</option><option value="m³">Metreküp</option><option value="saat">Saat</option><option value="adam-saat">Adam-saat</option></select>
                   </div>
                 )}
 
                 {/* KAYDET BUTONLARI */}
                 <div className="mt-4 flex justify-end gap-3 border-t border-slate-800 pt-4">
                   <button type="button" onClick={() => setModalType(null)} className="rounded-md px-4 py-2 font-sans text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">İptal</button>
-                  <button type="submit" className="flex items-center gap-2 rounded-md bg-cyan-600 px-6 py-2 font-sans text-sm font-bold text-white transition-colors hover:bg-cyan-500 shadow-lg shadow-cyan-900/50">
-                    <Save className="h-4 w-4" /> KAYDET
+                  <button type="submit" disabled={isSaving} className="flex items-center gap-2 rounded-md bg-cyan-600 px-6 py-2 font-sans text-sm font-bold text-white transition-colors hover:bg-cyan-500 shadow-lg shadow-cyan-900/50 disabled:opacity-50">
+                    <Save className="h-4 w-4" /> {isSaving ? 'KAYDEDİLİYOR' : 'KAYDET'}
                   </button>
                 </div>
               </form>

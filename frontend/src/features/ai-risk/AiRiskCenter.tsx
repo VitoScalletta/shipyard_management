@@ -1,59 +1,55 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   BrainCircuit, AlertTriangle, ShieldAlert,
   Activity, ArrowRight, Ship, Crosshair, Filter
 } from 'lucide-react';
-
-const GLOBAL_RISKS = [
-  {
-    id: 'GR-01',
-    projectId: 'PRJ-084',
-    projectName: 'TITAN DISCOVERY',
-    category: 'CRITICAL_PATH',
-    severity: 'HIGH',
-    title: 'Ana Katman Epoksi Görevinde Kritik Darboğaz',
-    description: 'Kritik yol üzerinde bulunan epoksi görevi bloke durumda. Teslimat 4 gün tehlikede.',
-    time: '10 dk önce'
-  },
-  {
-    id: 'GR-02',
-    projectId: 'PRJ-091',
-    projectName: 'OCEAN HORIZON',
-    category: 'RESOURCE',
-    severity: 'HIGH',
-    title: 'Vinç-04 Arızası Nedeniyle Bekleme',
-    description: 'Ağır tonajlı motor montajı için beklenen Vinç-04 periyodik bakımda arıza verdi.',
-    time: '1 saat önce'
-  },
-  {
-    id: 'GR-03',
-    projectId: 'PRJ-084',
-    projectName: 'TITAN DISCOVERY',
-    category: 'WORKFORCE',
-    severity: 'MEDIUM',
-    title: 'Boya Ekibinde Aşırı Yük (Overload)',
-    description: 'Yüzey hazırlığı tamamlandığı için boya ekibine aynı anda 3 farklı bölgeden iş talebi geldi.',
-    time: '2 saat önce'
-  },
-  {
-    id: 'GR-04',
-    projectId: 'PRJ-095',
-    projectName: 'NORDIC BREEZE',
-    category: 'SCHEDULE',
-    severity: 'LOW',
-    title: 'Kablo Çekimi %15 Geride',
-    description: 'C Güvertesi kablolama işlemleri planlanan hızın altında ilerliyor, henüz kritik yolda değil.',
-    time: '5 saat önce'
-  }
-];
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 export default function AiRiskCenter() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('ALL');
+  const [risks, setRisks] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredRisks = GLOBAL_RISKS.filter(r => filter === 'ALL' || r.severity === filter);
+  useEffect(() => {
+    const loadRisks = async () => {
+      try {
+        const { data: projects } = await api.get('/projects');
+        const analyses = await Promise.all(
+          projects.map(async (project: any) => {
+            const { data } = await api.get(`/ai-context/projects/${project.id}/latest`);
+            return { project, analysis: data };
+          }),
+        );
+        setRisks(
+          analyses.flatMap(({ project, analysis }) =>
+            (analysis?.risks ?? []).map((risk: any, index: number) => ({
+              id: `${analysis.id}-${index}`,
+              projectId: project.id,
+              projectName: project.name,
+              category: risk.type ?? 'GENERAL',
+              severity: risk.severity ?? analysis.overallRiskLevel,
+              title: risk.title ?? 'AI risk',
+              description: risk.description ?? '',
+              time: analysis.generatedTimestamp ? new Date(analysis.generatedTimestamp).toLocaleString('tr-TR') : '-',
+            })),
+          ),
+        );
+      } catch (error) {
+        console.error('AI risk verileri yüklenemedi:', error);
+        toast.error('AI risk kayıtları backend’den alınamadı.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadRisks();
+  }, []);
+
+  const filteredRisks = risks.filter((risk) => filter === 'ALL' || risk.severity === filter);
+  const countBySeverity = (severity: string) => risks.filter((risk) => risk.severity === severity).length;
 
   const getSeverityConfig = (severity: string) => {
     if (severity === 'HIGH') return { color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/30', icon: ShieldAlert, label: 'KRİTİK' };
@@ -86,7 +82,7 @@ export default function AiRiskCenter() {
               <span className="font-sans text-sm font-bold uppercase tracking-wider">Kritik Riskler</span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-bold text-rose-400">2</span>
+              <span className="font-mono text-3xl font-bold text-rose-400">{countBySeverity('HIGH')}</span>
               <span className="font-mono text-xs text-rose-500/70">ACİL MÜDAHALE GEREKİYOR</span>
             </div>
           </div>
@@ -97,7 +93,7 @@ export default function AiRiskCenter() {
               <span className="font-sans text-sm font-bold uppercase tracking-wider">Orta Seviye</span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-bold text-amber-400">1</span>
+              <span className="font-mono text-3xl font-bold text-amber-400">{countBySeverity('MEDIUM')}</span>
               <span className="font-mono text-xs text-amber-500/70">TAKİP EDİLMELİ</span>
             </div>
           </div>
@@ -108,7 +104,7 @@ export default function AiRiskCenter() {
               <span className="font-sans text-sm font-bold uppercase tracking-wider">Düşük Seviye</span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-bold text-emerald-400">1</span>
+              <span className="font-mono text-3xl font-bold text-emerald-400">{countBySeverity('LOW')}</span>
               <span className="font-mono text-xs text-emerald-500/70">OLASILIK DAHİLİNDE</span>
             </div>
           </div>
@@ -147,6 +143,12 @@ export default function AiRiskCenter() {
         {/* İstihbarat Akışı (Liste) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <AnimatePresence>
+            {isLoading && <p className="p-6 text-center text-sm text-slate-400">AI risk kayıtları yükleniyor...</p>}
+            {!isLoading && filteredRisks.length === 0 && (
+              <p className="rounded-lg border border-slate-800 p-6 text-center text-sm text-slate-400">
+                {risks.length === 0 ? 'Projeler için kayıtlı AI riski bulunamadı.' : 'Bu seviyede risk bulunamadı.'}
+              </p>
+            )}
             {filteredRisks.map((risk) => {
               const conf = getSeverityConfig(risk.severity);
               const Icon = conf.icon;

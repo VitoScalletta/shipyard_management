@@ -38,6 +38,11 @@ export class ProjectsController {
     return this.projectsService.findOne(id);
   }
 
+  @Get(':id/zones')
+  findProjectZones(@Param('id') id: string) {
+    return this.projectsService.findZonesByProjectId(id);
+  }
+
   @Patch(':id')
   updateProject(
     @Param('id') id: string,
