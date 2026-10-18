@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 
 describe('HealthController', () => {
   let controller: HealthController;
+  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -17,11 +18,22 @@ describe('HealthController', () => {
       providers: [
         {
           provide: HealthCheckService,
-          useValue: { check: jest.fn().mockResolvedValue({ status: 'ok' }) },
+          useValue: {
+            check: jest.fn(
+              async (checks: Array<() => Promise<unknown>>) => {
+                await Promise.all(checks.map((check) => check()));
+                return { status: 'ok' };
+              },
+            ),
+          },
         },
         {
           provide: TypeOrmHealthIndicator,
-          useValue: { pingCheck: jest.fn() },
+          useValue: {
+            pingCheck: jest
+              .fn()
+              .mockResolvedValue({ database: { status: 'up' } }),
+          },
         },
         {
           provide: MemoryHealthIndicator,
@@ -46,6 +58,11 @@ describe('HealthController', () => {
     }).compile();
 
     controller = module.get<HealthController>(HealthController);
+    configService = module.get<ConfigService>(ConfigService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should be defined', () => {
@@ -58,7 +75,17 @@ describe('HealthController', () => {
   });
 
   it('should return readiness status', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true } as Response);
+
     const result = await controller.checkReadiness();
+
     expect(result).toEqual({ status: 'ok' });
+    expect(configService.get).toHaveBeenCalledWith('OLLAMA_URL');
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://127.0.0.1:11434/api/tags',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });

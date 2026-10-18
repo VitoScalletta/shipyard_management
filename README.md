@@ -42,6 +42,13 @@ containers on the Compose network. To run the API and supporting services in
 Compose, use `docker compose up --build -d`. The Compose API is published on
 `localhost:3001` so the local backend can use `localhost:3000` without a port
 conflict; the frontend Vite server is allowed by CORS on `localhost:5173`.
+The frontend defaults to the Compose API at `http://localhost:3001/api/v1`.
+For a locally started API on port 3000, set `VITE_API_URL=http://localhost:3000/api/v1`
+in `frontend/.env`.
+
+`backend/src/database/seed.ts` inserts fictional demo ships, projects, areas,
+and tasks. It is disabled unless `SEED_DEMO_DATA=true` is explicitly set, so
+demo records are not added to a database by accident.
 
 ## Compile and run the project
 

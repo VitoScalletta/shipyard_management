@@ -1,278 +1,420 @@
-import { useState, useEffect } from 'react';
-import {
-  Users, Wrench, HardHat, Plus, UserPlus, PackagePlus, X, Save
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, Filter, HardHat, Plus, Search, ShieldAlert, Users, UserCheck, UserMinus, Wrench } from 'lucide-react';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
+
+interface WorkforceUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
+
+interface WorkforceTeam {
+  id: string;
+  name: string;
+  department: string;
+  capacity: number;
+  members?: WorkforceEmployee[];
+}
+
+interface WorkforceEmployee {
+  id: string;
+  department: string;
+  jobPosition: string;
+  skillLevel: string;
+  shift: string;
+  workingHours: number;
+  isAvailable: boolean;
+  user?: WorkforceUser;
+  team?: WorkforceTeam;
+}
+
+interface WorkforceResource {
+  id: string;
+  name: string;
+  description?: string;
+  type: string;
+  status: string;
+  totalQuantity: number;
+  availableQuantity: number;
+  unit: string;
+}
+
+const DEPARTMENTS = [
+  { value: 'WELDING', label: 'Kaynak' },
+  { value: 'PAINTING', label: 'Boya' },
+  { value: 'ELECTRICAL', label: 'Elektrik' },
+  { value: 'MECHANICAL', label: 'Mekanik' },
+  { value: 'ASSEMBLY', label: 'Montaj' },
+  { value: 'LOGISTICS', label: 'Lojistik' },
+];
 
 export default function WorkforceDashboard() {
-  const [activeTab, setActiveTab] = useState<'TEAMS' | 'RESOURCES'>('TEAMS');
-  const [modalType, setModalType] = useState<'TEAM' | 'WORKER' | 'EQUIPMENT' | null>(null);
-  const [teams, setTeams] = useState<any[]>([]);
-  const [resources, setResources] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<WorkforceEmployee[]>([]);
+  const [teams, setTeams] = useState<WorkforceTeam[]>([]);
+  const [users, setUsers] = useState<WorkforceUser[]>([]);
+  const [resources, setResources] = useState<WorkforceResource[]>([]);
+  const [activeTab, setActiveTab] = useState<'employees' | 'resources'>('employees');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [availabilityFilter, setAvailabilityFilter] = useState('ALL');
+  const [modal, setModal] = useState<'team' | 'employee' | 'resource' | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [teamForm, setTeamForm] = useState({ name: '', department: 'WELDING', capacity: '0', leaderId: '' });
+  const [employeeForm, setEmployeeForm] = useState({
+    userId: '', department: 'WELDING', jobPosition: '', skillLevel: 'JUNIOR',
+    shift: 'MORNING', workingHours: '45', teamId: '',
+  });
+  const [resourceForm, setResourceForm] = useState({
+    name: '', description: '', type: 'EQUIPMENT', totalQuantity: '1', unit: 'adet',
+  });
 
-  const loadData = async () => {
+  const loadWorkforce = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
     try {
-      const [teamsResponse, resourcesResponse] = await Promise.all([
+      const [employeeResponse, teamResponse, userResponse, resourceResponse] = await Promise.all([
+        api.get('/workforce/employees'),
         api.get('/workforce/teams'),
+        api.get('/users'),
         api.get('/resources'),
       ]);
-      setTeams(teamsResponse.data.map((team: any) => ({
-        id: team.id,
-        name: team.name,
-        dept: team.department,
-        workers: team.members?.length ?? 0,
-        capacity: Number(team.capacity ?? 0),
-      })));
-      setResources(resourcesResponse.data.map((resource: any) => ({
-        ...resource,
-        condition: `${resource.availableQuantity}/${resource.totalQuantity} ${resource.unit}`,
-      })));
+      setEmployees(employeeResponse.data);
+      setTeams(teamResponse.data);
+      setUsers(userResponse.data);
+      setResources(resourceResponse.data);
     } catch (error) {
-      toast.error('Ekip ve kaynak verileri yüklenemedi.');
+      console.error('İşgücü ve kaynak verileri yüklenemedi:', error);
+      setLoadError('İşgücü veya kaynak bilgileri yüklenemedi. Backend bağlantısını ve kullanıcı yetkilerini kontrol edin.');
+      toast.error('İşgücü ve kaynak verileri yüklenemedi.');
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const values = new FormData(e.currentTarget);
+  useEffect(() => {
+    void loadWorkforce();
+  }, [loadWorkforce]);
+
+  const availableUsers = useMemo(() => {
+    const assignedIds = new Set(employees.map((employee) => employee.user?.id).filter(Boolean));
+    return users.filter((user) => !assignedIds.has(user.id));
+  }, [employees, users]);
+
+  const filteredEmployees = employees.filter((employee) => {
+    const userName = `${employee.user?.firstName ?? ''} ${employee.user?.lastName ?? ''}`.trim();
+    const matchesSearch = `${userName} ${employee.jobPosition} ${employee.team?.name ?? ''}`
+      .toLocaleLowerCase('tr')
+      .includes(searchQuery.toLocaleLowerCase('tr'));
+    const matchesAvailability = availabilityFilter === 'ALL'
+      || (availabilityFilter === 'AVAILABLE' ? employee.isAvailable : !employee.isAvailable);
+    return matchesSearch && matchesAvailability;
+  });
+  const filteredResources = resources.filter((resource) => {
+    const matchesSearch = `${resource.name} ${resource.type} ${resource.description ?? ''}`
+      .toLocaleLowerCase('tr')
+      .includes(searchQuery.toLocaleLowerCase('tr'));
+    const matchesStatus = availabilityFilter === 'ALL' || resource.status === availabilityFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const createTeam = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsSaving(true);
     try {
-      if (modalType === 'TEAM') {
-        await api.post('/workforce/teams', {
-          name: values.get('name'),
-          department: values.get('department'),
-          capacity: Number(values.get('capacity') || 0),
-        });
-      } else if (modalType === 'EQUIPMENT') {
-        const quantity = Number(values.get('quantity'));
-        await api.post('/resources', {
-          name: values.get('name'),
-          type: values.get('type'),
-          status: 'AVAILABLE',
-          totalQuantity: quantity,
-          availableQuantity: quantity,
-          unit: values.get('unit'),
-        });
-      } else if (modalType === 'WORKER') {
-        const { data: tokens } = await api.post('/auth/register', {
-          email: values.get('email'),
-          password: values.get('password'),
-          firstName: values.get('firstName'),
-          lastName: values.get('lastName'),
-        });
-        const { data: user } = await api.get('/auth/me', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        });
-        await api.post('/workforce/employees', {
-          user: { id: user.id },
-          department: values.get('department'),
-          team: values.get('teamId') ? { id: values.get('teamId') } : undefined,
-          jobPosition: values.get('jobPosition'),
-        });
-      }
-      toast.success('Kayıt başarıyla sisteme eklendi.');
-      setModalType(null);
-      await loadData();
+      await api.post('/workforce/teams', {
+        name: teamForm.name.trim(),
+        department: teamForm.department,
+        capacity: Number(teamForm.capacity),
+        ...(teamForm.leaderId ? { leader: { id: teamForm.leaderId } } : {}),
+      });
+      toast.success('Takım oluşturuldu.');
+      setModal(null);
+      setTeamForm({ name: '', department: 'WELDING', capacity: '0', leaderId: '' });
+      await loadWorkforce();
     } catch (error: any) {
-      toast.error(error.response?.data?.message ?? 'Kayıt oluşturulamadı.');
+      toast.error(error.response?.data?.message ?? 'Takım oluşturulamadı.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  return (
-    <div className="relative flex h-full flex-col gap-6 overflow-hidden">
+  const createEmployee = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSaving(true);
+    try {
+      await api.post('/workforce/employees', {
+        user: { id: employeeForm.userId },
+        department: employeeForm.department,
+        jobPosition: employeeForm.jobPosition.trim(),
+        skillLevel: employeeForm.skillLevel,
+        shift: employeeForm.shift,
+        workingHours: Number(employeeForm.workingHours),
+        isAvailable: true,
+        ...(employeeForm.teamId ? { team: { id: employeeForm.teamId } } : {}),
+      });
+      toast.success('Personel kaydı oluşturuldu.');
+      setModal(null);
+      setEmployeeForm({
+        userId: '', department: 'WELDING', jobPosition: '', skillLevel: 'JUNIOR',
+        shift: 'MORNING', workingHours: '45', teamId: '',
+      });
+      await loadWorkforce();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? 'Personel kaydı oluşturulamadı.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      {/* Üst Başlık */}
-      <div className="flex shrink-0 items-center justify-between">
+  const createResource = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSaving(true);
+    const quantity = Number(resourceForm.totalQuantity);
+    try {
+      await api.post('/resources', {
+        name: resourceForm.name.trim(),
+        description: resourceForm.description.trim() || undefined,
+        type: resourceForm.type,
+        status: 'AVAILABLE',
+        totalQuantity: quantity,
+        availableQuantity: quantity,
+        unit: resourceForm.unit,
+      });
+      toast.success('Kaynak envantere eklendi.');
+      setModal(null);
+      setResourceForm({ name: '', description: '', type: 'EQUIPMENT', totalQuantity: '1', unit: 'adet' });
+      await loadWorkforce();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? 'Kaynak envantere eklenemedi.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateResourceStatus = async (resource: WorkforceResource, status: string) => {
+    try {
+      await api.patch(`/resources/${resource.id}`, { status });
+      await loadWorkforce();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? 'Kaynak durumu güncellenemedi.');
+    }
+  };
+
+  const toggleAvailability = async (employee: WorkforceEmployee) => {
+    try {
+      await api.patch(`/workforce/employees/${employee.id}`, { isAvailable: !employee.isAvailable });
+      await loadWorkforce();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? 'Personel durumu güncellenemedi.');
+    }
+  };
+
+  const availableCount = employees.filter((employee) => employee.isAvailable).length;
+  const unavailableCount = employees.length - availableCount;
+  const inputClass = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100';
+
+  return (
+    <div className="relative z-10 flex h-full flex-col gap-6 overflow-hidden">
+      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-950/30 text-emerald-500 border border-emerald-900/50">
-            <HardHat className="h-6 w-6" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-600 dark:border-cyan-900/50 dark:bg-cyan-950/30 dark:text-cyan-500">
+            <Users className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-sans text-2xl font-bold text-slate-100">İşgücü ve Kaynak Yönetimi</h1>
-            <p className="font-mono text-sm text-slate-500">PERSONEL KAPASİTESİ VE SAHA ENVANTERİ</p>
+            <h1 className="font-sans text-2xl font-bold text-slate-900 dark:text-slate-100">İşgücü ve Kaynak</h1>
+            <p className="font-mono text-sm text-slate-500">PERSONEL, TAKIM VE KAPASİTE YÖNETİMİ</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {activeTab === 'employees' && <button onClick={() => setModal('team')} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 hover:text-cyan-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:text-cyan-400"><Plus className="h-4 w-4" /> TAKIM OLUŞTUR</button>}
+          <button onClick={() => setModal(activeTab === 'employees' ? 'employee' : 'resource')} className="flex items-center gap-2 rounded-md bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-cyan-500">
+            <Plus className="h-4 w-4" /> {activeTab === 'employees' ? 'PERSONEL EKLE' : 'KAYNAK EKLE'}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 gap-2 border-b border-slate-200 dark:border-slate-800">
+        <button onClick={() => { setActiveTab('employees'); setAvailabilityFilter('ALL'); }} className={`border-b-2 px-4 py-2 text-sm font-semibold ${activeTab === 'employees' ? 'border-cyan-500 text-cyan-700 dark:text-cyan-400' : 'border-transparent text-slate-500'}`}>Personel ve takımlar</button>
+        <button onClick={() => { setActiveTab('resources'); setAvailabilityFilter('ALL'); }} className={`border-b-2 px-4 py-2 text-sm font-semibold ${activeTab === 'resources' ? 'border-cyan-500 text-cyan-700 dark:text-cyan-400' : 'border-transparent text-slate-500'}`}>Ekipman ve kaynaklar</button>
+      </div>
+
+      <div className="grid shrink-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {activeTab === 'employees' ? <>
+        <Metric icon={<HardHat className="h-4 w-4" />} label="Toplam Personel" value={employees.length} suffix="Kişi" tone="slate" />
+        <Metric icon={<Activity className="h-4 w-4" />} label="Müsait" value={availableCount} suffix="Atanabilir" tone="emerald" />
+        <Metric icon={<UserCheck className="h-4 w-4" />} label="Müsait Değil" value={unavailableCount} suffix="Kişi" tone="cyan" />
+        <Metric icon={<Users className="h-4 w-4" />} label="Takım Sayısı" value={teams.length} suffix="Takım" tone="rose" />
+        </> : <>
+        <Metric icon={<Wrench className="h-4 w-4" />} label="Toplam Kaynak" value={resources.length} suffix="Kayıt" tone="slate" />
+        <Metric icon={<Activity className="h-4 w-4" />} label="Kullanılabilir" value={resources.filter((resource) => resource.status === 'AVAILABLE').length} suffix="Kaynak" tone="emerald" />
+        <Metric icon={<Wrench className="h-4 w-4" />} label="Kullanımda" value={resources.filter((resource) => resource.status === 'IN_USE').length} suffix="Kaynak" tone="cyan" />
+        <Metric icon={<Wrench className="h-4 w-4" />} label="Bakımda" value={resources.filter((resource) => resource.status === 'MAINTENANCE').length} suffix="Kaynak" tone="rose" />
+        </>}
+      </div>
+
+      <div className="relative z-20 flex shrink-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white/80 p-3 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input type="text" placeholder={activeTab === 'employees' ? 'Personel adı, rol veya takım ara...' : 'Kaynak adı veya türü ara...'} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className={`${inputClass} pl-9`} />
+          </div>
+          <div className="relative min-w-[180px]">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <select value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className={`${inputClass} cursor-pointer pl-9`}>
+              <option value="ALL">Tüm Durumlar</option>
+              {activeTab === 'employees' ? <>
+                <option value="AVAILABLE">Müsait</option><option value="UNAVAILABLE">Müsait Değil</option>
+              </> : <>
+                <option value="AVAILABLE">Kullanılabilir</option><option value="IN_USE">Kullanımda</option><option value="MAINTENANCE">Bakımda</option><option value="DEPLETED">Tükendi</option>
+              </>}
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Sekmeler (Tabs) */}
-      <div className="flex shrink-0 gap-4 border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('TEAMS')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 font-sans text-sm font-bold transition-colors ${activeTab === 'TEAMS' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-        >
-          <Users className="h-4 w-4" /> Ekipler ve Kapasite
-        </button>
-        <button
-          onClick={() => setActiveTab('RESOURCES')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 font-sans text-sm font-bold transition-colors ${activeTab === 'RESOURCES' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-        >
-          <Wrench className="h-4 w-4" /> Ekipman ve Malzeme Havuzu
-        </button>
-      </div>
-
-      {/* Aksiyon Butonları (Action Bar) */}
-      <div className="flex shrink-0 gap-3">
-        {activeTab === 'TEAMS' ? (
-          <>
-            <button onClick={() => setModalType('TEAM')} className="flex items-center gap-2 rounded-md bg-cyan-950/40 border border-cyan-500/30 px-4 py-2 font-sans text-xs font-bold text-cyan-400 transition-colors hover:bg-cyan-900">
-              <Plus className="h-4 w-4" /> YENİ TAKIM OLUŞTUR
-            </button>
-            <button onClick={() => setModalType('WORKER')} className="flex items-center gap-2 rounded-md bg-slate-800 border border-slate-700 px-4 py-2 font-sans text-xs font-bold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white">
-              <UserPlus className="h-4 w-4" /> PERSONEL EKLE & ATA
-            </button>
-          </>
+      <div className="flex-1 overflow-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-slate-500">İşgücü verileri yükleniyor...</div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center gap-3 p-8 text-center text-sm text-rose-600 dark:text-rose-400">
+            <p>{loadError}</p>
+            <button onClick={() => void loadWorkforce()} className="rounded-md bg-cyan-600 px-4 py-2 text-xs font-bold text-white hover:bg-cyan-500">Tekrar dene</button>
+          </div>
         ) : (
-          <button onClick={() => setModalType('EQUIPMENT')} className="flex items-center gap-2 rounded-md bg-emerald-950/40 border border-emerald-500/30 px-4 py-2 font-sans text-xs font-bold text-emerald-400 transition-colors hover:bg-emerald-900">
-            <PackagePlus className="h-4 w-4" /> YENİ EKİPMAN EKLE
-          </button>
+          <table className="w-full text-left font-sans text-sm">
+            <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-400">
+              <tr>
+                {activeTab === 'employees' ? <>
+                  <th className="px-5 py-4 font-medium">Personel Bilgisi</th>
+                  <th className="px-5 py-4 font-medium">Bağlı Olduğu Takım</th>
+                  <th className="px-5 py-4 font-medium">Durum</th>
+                  <th className="px-5 py-4 font-medium">Çalışma Bilgisi</th>
+                  <th className="px-5 py-4 text-right font-medium">İşlemler</th>
+                </> : <>
+                  <th className="px-5 py-4 font-medium">Kaynak</th>
+                  <th className="px-5 py-4 font-medium">Tür</th>
+                  <th className="px-5 py-4 font-medium">Miktar</th>
+                  <th className="px-5 py-4 font-medium">Durum</th>
+                  <th className="px-5 py-4 text-right font-medium">Durumu Güncelle</th>
+                </>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+              {activeTab === 'employees' ? filteredEmployees.map((employee) => {
+                const name = `${employee.user?.firstName ?? ''} ${employee.user?.lastName ?? ''}`.trim() || employee.user?.email || 'İsimsiz kullanıcı';
+                return (
+                  <tr key={employee.id} className="group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {name.split(' ').map((part) => part[0]).join('').slice(0, 2)}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900 dark:text-slate-100">{name}</span>
+                          <span className="font-mono text-[10px] text-slate-500">{employee.jobPosition} · {employee.department}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-slate-400" />{employee.team?.name ?? 'Takım atanmamış'}</span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] font-bold ${employee.isAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400'}`}>
+                        {employee.isAvailable ? <UserCheck className="h-3 w-3" /> : <UserMinus className="h-3 w-3" />}
+                        {employee.isAvailable ? 'MÜSAİT' : 'MÜSAİT DEĞİL'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-slate-600 dark:text-slate-400">
+                      <div className="flex items-center gap-2"><Wrench className="h-4 w-4" />{employee.skillLevel} · {employee.shift} vardiyası · {employee.workingHours} saat/hafta</div>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button onClick={() => void toggleAvailability(employee)} className="rounded px-3 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-50 dark:text-cyan-400 dark:hover:bg-cyan-950/40">
+                        {employee.isAvailable ? 'Müsaitliği kaldır' : 'Müsait yap'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }) : filteredResources.map((resource) => (
+                <tr key={resource.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-4"><div className="font-semibold text-slate-900 dark:text-slate-100">{resource.name}</div><div className="text-xs text-slate-500">{resource.description || 'Açıklama yok'}</div></td>
+                  <td className="px-5 py-4 text-slate-700 dark:text-slate-300">{resource.type}</td>
+                  <td className="px-5 py-4 font-mono text-slate-700 dark:text-slate-300">{resource.availableQuantity} / {resource.totalQuantity} {resource.unit}</td>
+                  <td className="px-5 py-4 text-slate-700 dark:text-slate-300">{resource.status}</td>
+                  <td className="px-5 py-4 text-right">
+                    <select aria-label={`${resource.name} durumu`} value={resource.status} onChange={(event) => void updateResourceStatus(resource, event.target.value)} className={`${inputClass} ml-auto max-w-40 py-1.5 text-xs`}>
+                      <option value="AVAILABLE">Kullanılabilir</option><option value="IN_USE">Kullanımda</option><option value="MAINTENANCE">Bakımda</option><option value="DEPLETED">Tükendi</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {(activeTab === 'employees' ? filteredEmployees.length === 0 : filteredResources.length === 0) && (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-slate-500">{activeTab === 'employees' ? (employees.length ? 'Filtreye uygun personel bulunamadı.' : 'Henüz personel kaydı bulunmuyor.') : (resources.length ? 'Filtreye uygun kaynak bulunamadı.' : 'Henüz kaynak kaydı bulunmuyor.')}</td></tr>
+              )}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {/* İçerik Alanı */}
-      <div className="flex-1 overflow-y-auto pr-2 pb-10">
-        <AnimatePresence mode="wait">
-
-          {/* SEKME 1: EKİPLER VE KAPASİTE */}
-          {activeTab === 'TEAMS' && (
-            <motion.div key="teams" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {teams.map(team => (
-                <div key={team.id} className="flex flex-col gap-4 rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-sans text-lg font-bold text-slate-200">{team.name}</h3>
-                      <span className="font-mono text-[10px] text-slate-500">{team.dept}</span>
-                    </div>
-                    <div className="flex items-center gap-1 rounded bg-slate-800 px-2 py-1 font-mono text-xs text-slate-300">
-                      <Users className="h-3.5 w-3.5 text-cyan-500" /> {team.workers}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-800/50 pt-3 font-mono text-xs text-slate-400">
-                    Kapasite: <span className="text-slate-200">{team.capacity}</span>
-                  </div>
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Kapat" className="absolute inset-0 bg-slate-950/60" onClick={() => setModal(null)} />
+          <form onSubmit={modal === 'team' ? createTeam : modal === 'employee' ? createEmployee : createResource} className="relative z-10 w-full max-w-lg space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{modal === 'team' ? 'Yeni takım oluştur' : modal === 'employee' ? 'Personel kaydı ekle' : 'Kaynağı envantere ekle'}</h2>
+              <button type="button" onClick={() => setModal(null)} aria-label="Kapat" className="text-slate-500 hover:text-slate-900 dark:hover:text-white">×</button>
+            </div>
+            {modal === 'team' ? (
+              <>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Takım adı<input className={`${inputClass} mt-1`} required value={teamForm.name} onChange={(event) => setTeamForm({ ...teamForm, name: event.target.value })} /></label>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Bölüm<select className={`${inputClass} mt-1`} value={teamForm.department} onChange={(event) => setTeamForm({ ...teamForm, department: event.target.value })}>{DEPARTMENTS.map((department) => <option key={department.value} value={department.value}>{department.label}</option>)}</select></label>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Kapasite<input type="number" min="0" className={`${inputClass} mt-1`} value={teamForm.capacity} onChange={(event) => setTeamForm({ ...teamForm, capacity: event.target.value })} /></label>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Takım lideri<select className={`${inputClass} mt-1`} value={teamForm.leaderId} onChange={(event) => setTeamForm({ ...teamForm, leaderId: event.target.value })}><option value="">Atanmamış</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.user?.firstName} {employee.user?.lastName}</option>)}</select></label>
+              </>
+            ) : modal === 'employee' ? (
+              <>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Kullanıcı hesabı<select className={`${inputClass} mt-1`} required value={employeeForm.userId} onChange={(event) => setEmployeeForm({ ...employeeForm, userId: event.target.value })}><option value="">Kullanıcı seçin</option>{availableUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>)}</select></label>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Görev/ünvan<input className={`${inputClass} mt-1`} required value={employeeForm.jobPosition} onChange={(event) => setEmployeeForm({ ...employeeForm, jobPosition: event.target.value })} /></label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-sm text-slate-600 dark:text-slate-300">Bölüm<select className={`${inputClass} mt-1`} value={employeeForm.department} onChange={(event) => setEmployeeForm({ ...employeeForm, department: event.target.value })}>{DEPARTMENTS.map((department) => <option key={department.value} value={department.value}>{department.label}</option>)}</select></label>
+                  <label className="block text-sm text-slate-600 dark:text-slate-300">Takım<select className={`${inputClass} mt-1`} value={employeeForm.teamId} onChange={(event) => setEmployeeForm({ ...employeeForm, teamId: event.target.value })}><option value="">Atanmamış</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
+                  <label className="block text-sm text-slate-600 dark:text-slate-300">Yetkinlik<select className={`${inputClass} mt-1`} value={employeeForm.skillLevel} onChange={(event) => setEmployeeForm({ ...employeeForm, skillLevel: event.target.value })}><option value="JUNIOR">Junior</option><option value="MID">Orta</option><option value="SENIOR">Kıdemli</option><option value="EXPERt">Uzman</option></select></label>
+                  <label className="block text-sm text-slate-600 dark:text-slate-300">Vardiya<select className={`${inputClass} mt-1`} value={employeeForm.shift} onChange={(event) => setEmployeeForm({ ...employeeForm, shift: event.target.value })}><option value="MORNING">Sabah</option><option value="EVENING">Akşam</option><option value="NIGHT">Gece</option></select></label>
                 </div>
-              ))}
-            </motion.div>
-          )}
-
-          {/* SEKME 2: EKİPMAN VE MALZEME HAVUZU */}
-          {activeTab === 'RESOURCES' && (
-            <motion.div key="resources" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {resources.map(res => (
-                <div key={res.id} className="flex flex-col justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-4">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-start justify-between">
-                      <span className="font-mono text-[10px] text-slate-500">{res.type}</span>
-                      {res.status === 'IN_USE' && <span className="rounded bg-cyan-950/50 border border-cyan-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-cyan-400">KULLANIMDA</span>}
-                      {res.status === 'AVAILABLE' && <span className="rounded bg-emerald-950/50 border border-emerald-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">MÜSAİT</span>}
-                      {res.status === 'MAINTENANCE' && <span className="rounded bg-rose-950/50 border border-rose-500/30 px-2 py-0.5 font-mono text-[9px] font-bold text-rose-400 animate-pulse">BAKIMDA</span>}
-                    </div>
-                    <h3 className="font-sans text-sm font-bold text-slate-200 leading-tight">{res.name}</h3>
-                  </div>
-                  <div className="mt-4 flex flex-col gap-1.5 border-t border-slate-800/50 pt-3 font-mono text-xs">
-                    <div className="flex justify-between text-slate-400"><span>Stok:</span> <span className={res.status === 'MAINTENANCE' || res.status === 'DEPLETED' ? 'text-amber-500' : 'text-slate-300'}>{res.condition}</span></div>
-                  </div>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Haftalık çalışma saati<input type="number" min="0" className={`${inputClass} mt-1`} value={employeeForm.workingHours} onChange={(event) => setEmployeeForm({ ...employeeForm, workingHours: event.target.value })} /></label>
+                {availableUsers.length === 0 && <p className="text-sm text-amber-700 dark:text-amber-400">Personel kaydı oluşturulabilecek kullanıcı bulunamadı. Önce kullanıcı hesabı oluşturun.</p>}
+              </>
+            ) : (
+              <>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Kaynak adı<input className={`${inputClass} mt-1`} required value={resourceForm.name} onChange={(event) => setResourceForm({ ...resourceForm, name: event.target.value })} /></label>
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Açıklama<textarea className={`${inputClass} mt-1`} rows={2} value={resourceForm.description} onChange={(event) => setResourceForm({ ...resourceForm, description: event.target.value })} /></label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-sm text-slate-600 dark:text-slate-300">Tür<select className={`${inputClass} mt-1`} value={resourceForm.type} onChange={(event) => setResourceForm({ ...resourceForm, type: event.target.value })}><option value="EQUIPMENT">Ekipman</option><option value="MACHINE">Makine</option><option value="TOOl">Alet</option><option value="MATERIAL">Malzeme</option></select></label>
+                  <label className="block text-sm text-slate-600 dark:text-slate-300">Birim<select className={`${inputClass} mt-1`} value={resourceForm.unit} onChange={(event) => setResourceForm({ ...resourceForm, unit: event.target.value })}><option value="adet">Adet</option><option value="m">Metre</option><option value="m²">Metrekare</option><option value="m³">Metreküp</option><option value="kg">Kilogram</option><option value="saat">Saat</option></select></label>
                 </div>
-              ))}
-            </motion.div>
-          )}
-
-        </AnimatePresence>
-      </div>
-
-      {/* İşlem Modalı (Drawer/Popup) */}
-      <AnimatePresence>
-        {modalType && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalType(null)} className="absolute inset-0 z-40 bg-slate-950/60 backdrop-blur-sm" />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="absolute left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-sans text-lg font-bold text-slate-100">
-                  {modalType === 'TEAM' && 'Yeni Takım Oluştur'}
-                  {modalType === 'WORKER' && 'Personel Ekle ve Takıma Ata'}
-                  {modalType === 'EQUIPMENT' && 'Yeni Ekipman / Malzeme Ekle'}
-                </h2>
-                <button onClick={() => setModalType(null)} className="text-slate-400 hover:text-slate-200"><X className="h-5 w-5" /></button>
-              </div>
-
-              <form onSubmit={handleSave} className="flex flex-col gap-4">
-
-               {/* PERSONEL EKLEME FORMU */}
-                {modalType === 'WORKER' && (
-                  <>
-                    <input required name="firstName" placeholder="Ad" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                    <input required name="lastName" placeholder="Soyad" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                    <input required type="email" name="email" placeholder="E-posta" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                    <input required minLength={6} type="password" name="password" placeholder="Geçici şifre (en az 6 karakter)" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                    <input required name="jobPosition" placeholder="Görev unvanı" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-mono text-xs text-slate-400">Atanacak Takım</label>
-                      <select name="teamId" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none">
-                        <option value="">Takım seçmeyin</option>
-                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
-                    </div>
-                    <select required name="department" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200">
-                      <option value="PAINTING">Boya</option><option value="WELDING">Kaynak</option><option value="ELECTRICAL">Elektrik</option><option value="MECHANICAL">Mekanik</option><option value="ASSEMBLY">Montaj</option><option value="LOGISTICS">Lojistik</option>
-                    </select>
-                  </>
-                )}
-
-                {/* ORTAK İSİM/BAŞLIK ALANI (Takım, Ekipman ve Görev için) */}
-                {(modalType === 'TEAM' || modalType === 'EQUIPMENT') && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-xs text-slate-400">
-                      İsim / Başlık
-                    </label>
-                    <input required name="name" type="text" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="Buraya yazın..." />
-                  </div>
-                )}
-
-                {modalType === 'TEAM' && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-xs text-slate-400">Departman</label>
-                    <select required name="department" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200">
-                      <option value="PAINTING">Boya</option><option value="WELDING">Kaynak</option><option value="ELECTRICAL">Elektrik</option><option value="MECHANICAL">Mekanik</option><option value="ASSEMBLY">Montaj</option><option value="LOGISTICS">Lojistik</option>
-                    </select>
-                    <label className="font-mono text-xs text-slate-400">Kapasite</label>
-                    <input required min="0" type="number" name="capacity" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                  </div>
-                )}
-
-                {modalType === 'EQUIPMENT' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <select name="type" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200"><option value="EQUIPMENT">Ekipman</option><option value="MACHINE">Makine</option><option value="TOOl">El aleti</option><option value="MATERIAL">Malzeme</option></select>
-                    <input required min="0" type="number" step="0.01" name="quantity" placeholder="Miktar" className="rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200" />
-                    <select name="unit" className="col-span-2 rounded-md border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-200"><option value="adet">Adet</option><option value="kg">kg</option><option value="m">Metre</option><option value="m²">Metrekare</option><option value="m³">Metreküp</option><option value="saat">Saat</option><option value="adam-saat">Adam-saat</option></select>
-                  </div>
-                )}
-
-                {/* KAYDET BUTONLARI */}
-                <div className="mt-4 flex justify-end gap-3 border-t border-slate-800 pt-4">
-                  <button type="button" onClick={() => setModalType(null)} className="rounded-md px-4 py-2 font-sans text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">İptal</button>
-                  <button type="submit" disabled={isSaving} className="flex items-center gap-2 rounded-md bg-cyan-600 px-6 py-2 font-sans text-sm font-bold text-white transition-colors hover:bg-cyan-500 shadow-lg shadow-cyan-900/50 disabled:opacity-50">
-                    <Save className="h-4 w-4" /> {isSaving ? 'KAYDEDİLİYOR' : 'KAYDET'}
-                  </button>
-                </div>
-              </form>
-
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
+                <label className="block text-sm text-slate-600 dark:text-slate-300">Miktar<input type="number" min="0" step="0.01" required className={`${inputClass} mt-1`} value={resourceForm.totalQuantity} onChange={(event) => setResourceForm({ ...resourceForm, totalQuantity: event.target.value })} /></label>
+              </>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setModal(null)} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">İptal</button>
+              <button type="submit" disabled={isSaving || (modal === 'employee' && availableUsers.length === 0)} className="rounded-md bg-cyan-600 px-4 py-2 text-sm font-bold text-white hover:bg-cyan-500 disabled:opacity-50">{isSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
+}
+
+function Metric({ icon, label, value, suffix, tone }: { icon: React.ReactNode; label: string; value: number; suffix: string; tone: 'slate' | 'emerald' | 'cyan' | 'rose' }) {
+  const tones = {
+    slate: 'border-slate-200 bg-white/80 text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300',
+    emerald: 'border-emerald-200 bg-emerald-50/50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/10 dark:text-emerald-400',
+    cyan: 'border-cyan-200 bg-cyan-50/50 text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-950/10 dark:text-cyan-400',
+    rose: 'border-rose-200 bg-rose-50/50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/10 dark:text-rose-400',
+  };
+  return <div className={`flex flex-col justify-between rounded-lg border p-4 backdrop-blur-sm ${tones[tone]}`}><div className="flex items-center gap-2"><span>{icon}</span><span className="font-sans text-xs font-bold uppercase tracking-wider">{label}</span></div><div className="mt-2 font-mono text-2xl font-bold">{value} <span className="font-sans text-sm opacity-70">{suffix}</span></div></div>;
 }

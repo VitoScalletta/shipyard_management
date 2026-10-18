@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-// NestJS Backend adresimiz (.env'de yoksa varsayılan olarak localhost:3000/api kullanır)
+// Docker Compose API is published on port 3001; override for a locally started API.
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },

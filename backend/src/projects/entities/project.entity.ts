@@ -1,3 +1,4 @@
+import { ShipArea } from './../../ship-areas/entities/ship-area.entity';
 import {
   Column,
   CreateDateColumn,
@@ -11,8 +12,10 @@ import { Ship } from '../../ships/entities/ship.entity';
 
 export enum ProjectType {
   NEW_BUILDING = 'NEW_BUILDING',
+  REPAIR = 'REPAIR',
   MAINTENANCE = 'MAINTENANCE',
   CONVERSION = 'CONVERSION',
+  RETROFIT = 'RETROFIT',
 }
 
 export enum ProjectStatus {

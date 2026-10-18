@@ -5,18 +5,30 @@ import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { Clock, Users, AlertOctagon, CheckCircle2, Activity } from 'lucide-react';
 import TaskDetailDrawer from './TaskDetailDrawer';
+import { useTheme } from '@/contexts/ThemeContext'; // YENİ: Tema eklendi
 
-// 1. ÖZEL DÜĞÜM TASARIMI (Aynı)
+// 1. ÖZEL DÜĞÜM TASARIMI (ESKİ EFSANE TASARIM + BEYAZ TEMA UYUMU)
 const TaskNode = ({ data }: { data: any }) => {
   const isCritical = data.isCritical;
+  const { theme } = useTheme();
 
   const getStatusStyles = () => {
-    switch (data.status) {
-      case 'COMPLETED': return 'border-emerald-500/50 bg-emerald-950/20 text-emerald-500';
-      case 'IN_PROGRESS': return 'border-cyan-500/50 bg-cyan-950/20 text-cyan-400';
-      case 'DELAYED': return 'border-amber-500/50 bg-amber-950/20 text-amber-500';
-      case 'BLOCKED': return 'border-rose-500/80 bg-rose-950/30 text-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse';
-      default: return 'border-slate-700 bg-slate-900/50 text-slate-400';
+    if (theme === 'light') {
+      switch (data.status) {
+        case 'COMPLETED': return 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm';
+        case 'IN_PROGRESS': return 'border-cyan-300 bg-cyan-50 text-cyan-700 shadow-sm';
+        case 'DELAYED': return 'border-amber-300 bg-amber-50 text-amber-700 shadow-sm';
+        case 'BLOCKED': return 'border-rose-400 bg-rose-50 text-rose-700 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse';
+        default: return 'border-slate-200 bg-white text-slate-600 shadow-sm';
+      }
+    } else {
+      switch (data.status) {
+        case 'COMPLETED': return 'border-emerald-500/50 bg-emerald-950/20 text-emerald-500';
+        case 'IN_PROGRESS': return 'border-cyan-500/50 bg-cyan-950/20 text-cyan-400';
+        case 'DELAYED': return 'border-amber-500/50 bg-amber-950/20 text-amber-500';
+        case 'BLOCKED': return 'border-rose-500/80 bg-rose-950/30 text-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse';
+        default: return 'border-slate-700 bg-slate-900/50 text-slate-400';
+      }
     }
   };
 
@@ -31,20 +43,20 @@ const TaskNode = ({ data }: { data: any }) => {
   };
 
   return (
-    <div className={`relative w-64 rounded-lg border-2 p-3 backdrop-blur-md transition-all hover:scale-105 ${getStatusStyles()} ${isCritical && data.status !== 'COMPLETED' ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]' : ''}`}>
-      <Handle type="target" position={Position.Left} className="!h-3 !w-3 !border-2 !border-slate-900 !bg-slate-400" />
+    <div className={`relative w-64 rounded-lg border-2 p-3 backdrop-blur-md transition-all hover:scale-105 ${getStatusStyles()} ${isCritical && data.status !== 'COMPLETED' ? (theme === 'light' ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]') : ''}`}>
+      <Handle type="target" position={Position.Left} className={`!h-3 !w-3 !border-2 ${theme === 'light' ? '!border-white !bg-slate-400' : '!border-slate-900 !bg-slate-400'}`} />
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between">
-          <span className="font-sans text-sm font-bold text-slate-100">{data.label}</span>
+          <span className={`font-sans text-sm font-bold ${theme === 'light' ? 'text-slate-800' : 'text-slate-100'}`}>{data.label}</span>
           <StatusIcon />
         </div>
-        <div className="flex items-center gap-4 border-t border-slate-700/50 pt-2 font-mono text-xs text-slate-300">
-          <div className="flex items-center gap-1"><Users className="h-3 w-3 text-slate-500" />{data.team}</div>
-          <div className="flex items-center gap-1"><Clock className="h-3 w-3 text-slate-500" />{data.duration}</div>
-          {isCritical && <span className="ml-auto rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-bold text-rose-400">KRİTİK</span>}
+        <div className={`flex items-center gap-4 border-t pt-2 font-mono text-xs ${theme === 'light' ? 'border-slate-200 text-slate-500' : 'border-slate-700/50 text-slate-300'}`}>
+          <div className="flex items-center gap-1"><Users className="h-3 w-3 opacity-70" />{data.team}</div>
+          <div className="flex items-center gap-1"><Clock className="h-3 w-3 opacity-70" />{data.duration}</div>
+          {isCritical && <span className={`ml-auto rounded px-1.5 py-0.5 text-[9px] font-bold ${theme === 'light' ? 'bg-rose-100 text-rose-600' : 'bg-rose-500/20 text-rose-400'}`}>KRİTİK</span>}
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className="!h-3 !w-3 !border-2 !border-slate-900 !bg-cyan-500" />
+      <Handle type="source" position={Position.Right} className={`!h-3 !w-3 !border-2 ${theme === 'light' ? '!border-white !bg-cyan-500' : '!border-slate-900 !bg-cyan-500'}`} />
     </div>
   );
 };
@@ -64,32 +76,15 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges };
 };
 
-// YENİ: 3. İÇ KAMERA BİLEŞENİ (ReactFlowProvider sarmalaması gerektiği için)
-type TaskNodeData = {
-  id: string;
-  name: string;
-  status: string;
-  estimatedHours?: number;
-  assignedUsers?: { id: string }[];
-  isCritical?: boolean;
-};
-
-function FlowContent({
-  focusedNodeId,
-  tasks,
-  dependencies,
-  onTaskUpdated,
-}: {
-  focusedNodeId: string | null;
-  tasks: TaskNodeData[];
-  dependencies: { predecessor: { id: string }; successor: { id: string } }[];
-  onTaskUpdated: () => void;
-}) {
+// 3. İÇ KAMERA BİLEŞENİ
+function FlowContent({ focusedNodeId, tasks, dependencies, onTaskUpdated }: any) {
+  const { theme } = useTheme();
   const nodeTypes = useMemo(() => ({ taskNode: TaskNode }), []);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const { setCenter } = useReactFlow(); // Kamera kontrol motoru
+  const { setCenter } = useReactFlow();
+
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    const nodes: Node[] = tasks.map((task) => ({
+    const nodes: Node[] = tasks.map((task: any) => ({
       id: task.id,
       type: 'taskNode',
       position: { x: 0, y: 0 },
@@ -101,50 +96,45 @@ function FlowContent({
         isCritical: task.isCritical ?? false,
       },
     }));
-    const edges: Edge[] = dependencies.map(({ predecessor, successor }) => ({
+    const edges: Edge[] = dependencies.map(({ predecessor, successor }: any) => ({
       id: `${predecessor.id}-${successor.id}`,
       source: predecessor.id,
       target: successor.id,
       animated: true,
-      style: { stroke: '#475569', strokeWidth: 2 },
+      style: { stroke: theme === 'light' ? '#94a3b8' : '#475569', strokeWidth: 2 },
     }));
     return getLayoutedElements(nodes, edges);
-  }, [tasks, dependencies]);
+  }, [tasks, dependencies, theme]);
 
-  // Kamera Hareketi Efekti
   useEffect(() => {
     if (focusedNodeId) {
       const targetNode = layoutedNodes.find(n => n.id === focusedNodeId);
       if (targetNode) {
-        // Düğümün merkez koordinatlarına git (260w/100h)
-        const x = targetNode.position.x + 130;
-        const y = targetNode.position.y + 50;
-        setCenter(x, y, { zoom: 1.5, duration: 1200 }); // 1.2s uçuş animasyonu
+        setCenter(targetNode.position.x + 130, targetNode.position.y + 50, { zoom: 1.5, duration: 1200 });
       }
     }
-  }, [focusedNodeId, setCenter]);
+  }, [focusedNodeId, setCenter, layoutedNodes]);
 
   const onNodeClick = useCallback((_: any, node: Node) => {
-    const task = tasks.find(({ id }) => id === node.id);
-    if (task) {
-      setSelectedTask({
-        ...node.data,
-        ...task,
-        label: task.name,
-        duration: `${Number(task.estimatedHours ?? 0) / 8} Gün`,
-        team: task.assignedUsers?.length ?? 0,
-      });
-    }
+    const task = tasks.find(({ id }: any) => id === node.id);
+    if (task) setSelectedTask({ ...node.data, ...task, label: task.name });
   }, [tasks]);
 
   return (
     <>
-      <ReactFlow
-        nodes={layoutedNodes} edges={layoutedEdges} nodeTypes={nodeTypes}
-        onNodeClick={onNodeClick} fitView className="bg-slate-950" proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={40} color="#1e293b" size={1.5} />
-        <Controls className="overflow-hidden rounded-md border border-slate-800 !bg-slate-900 shadow-[0_0_15px_rgba(0,0,0,0.5)] [&_button]:!border-b [&_button]:!border-slate-800 [&_button]:!bg-slate-900 [&_button]:!fill-slate-400 hover:[&_button]:!bg-slate-800 hover:[&_button]:!fill-cyan-400 last:[&_button]:!border-none" />
+      {/* TEMA CSS OVERRIDE */}
+      <style>{`
+        .react-flow { background-color: transparent !important; }
+        .react-flow__controls-button {
+          background-color: ${theme === 'dark' ? '#1e293b' : '#ffffff'} !important;
+          fill: ${theme === 'dark' ? '#cbd5e1' : '#475569'} !important;
+          border-bottom: 1px solid ${theme === 'dark' ? '#334155' : '#e2e8f0'} !important;
+        }
+        .react-flow__controls-button:hover { background-color: ${theme === 'dark' ? '#334155' : '#f1f5f9'} !important; }
+      `}</style>
+      <ReactFlow nodes={layoutedNodes} edges={layoutedEdges} nodeTypes={nodeTypes} onNodeClick={onNodeClick} fitView proOptions={{ hideAttribution: true }}>
+        <Background gap={40} color={theme === 'dark' ? '#334155' : '#cbd5e1'} size={1.5} />
+        <Controls className="overflow-hidden rounded-md border border-slate-200 shadow-sm dark:border-slate-800 dark:shadow-[0_0_15px_rgba(0,0,0,0.5)]" />
       </ReactFlow>
       <TaskDetailDrawer isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onTaskUpdated={onTaskUpdated} />
     </>
@@ -152,21 +142,11 @@ function FlowContent({
 }
 
 // 4. DIŞA AKTARILAN ANA BİLEŞEN
-export default function CriticalPathGraph({
-  focusedNodeId,
-  tasks,
-  dependencies,
-  onTaskUpdated,
-}: {
-  focusedNodeId: string | null;
-  tasks: TaskNodeData[];
-  dependencies: { predecessor: { id: string }; successor: { id: string } }[];
-  onTaskUpdated: () => void;
-}) {
+export default function CriticalPathGraph(props: any) {
   return (
     <div className="h-full w-full">
       <ReactFlowProvider>
-        <FlowContent focusedNodeId={focusedNodeId} tasks={tasks} dependencies={dependencies} onTaskUpdated={onTaskUpdated} />
+        <FlowContent {...props} />
       </ReactFlowProvider>
     </div>
   );

@@ -37,10 +37,10 @@ function App() {
           <Route index element={<FleetDashboard />} />
           <Route path="project/:id" element={<ProjectDashboard />} />
           <Route path="ai-risk-center" element={<AiRiskCenter />} />
-          <Route path="ai-risk-center" element={<AiRiskCenter />} />
           <Route path="workforce" element={<WorkforceDashboard />} />
           <Route path="worker-board" element={<WorkerDashboard />} />
           <Route path="audit-log" element={<SystemAuditDashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </Router>

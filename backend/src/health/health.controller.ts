@@ -35,7 +35,7 @@ export class HealthController {
 
       async (): Promise<HealthIndicatorResult> => {
         const baseUrl =
-          this.configService.get<string>('Ollama_url') ||
+          this.configService.get<string>('OLLAMA_URL') ||
           'http://127.0.0.1:11434';
 
         try {

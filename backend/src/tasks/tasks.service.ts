@@ -127,6 +127,7 @@ export class TasksService {
         projectId: updatedTask.project.id,
       });
     }
+    return updatedTask;
   }
 
   async updateTaskStatus(taskId: string, newStatus: TaskStatus) {
@@ -232,6 +233,7 @@ export class TasksService {
         ship: true,
         shipArea: true,
         assignedUsers: true,
+        assignedTeams: true,
         resources: { resource: true },
       },
     });
@@ -249,7 +251,10 @@ export class TasksService {
     resourceId: string,
     requestedQuantity: number,
   ) {
-    const task = await this.taskRepository.findOne({ where: { id: taskId } });
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+      relations: { project: true },
+    });
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
     });

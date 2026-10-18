@@ -24,6 +24,12 @@ type SeedTask = {
 };
 
 async function runSeed() {
+  if (process.env.SEED_DEMO_DATA !== 'true') {
+    throw new Error(
+      'Bu seed yalnızca kurgusal demo verisi ekler. Çalıştırmak için SEED_DEMO_DATA=true ayarlayın.',
+    );
+  }
+
   await AppDataSource.initialize();
 
   try {
