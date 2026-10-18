@@ -1,3 +1,4 @@
+import { Project } from 'src/projects/entities/project.entity';
 import { MeasurementUnit } from '../../common/enums/measurement-unit.enum';
 import { Ship } from '../../ships/entities/ship.entity';
 import {
@@ -32,6 +33,12 @@ export class ShipArea {
   @ManyToOne(() => Ship, (ship) => ship.areas, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'ship_id' })
   ship: Ship;
+
+  @ManyToOne(() => Project, (project) => project.shipAreas, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'project_id' })
+  project: Project;
 
   @ManyToOne(() => ShipArea, (area) => area.subAreas, {
     onDelete: 'CASCADE',

@@ -5,6 +5,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -96,4 +97,7 @@ export class Project {
 
   @Column({ nullable: true })
   manager: string;
+
+  @OneToMany(() => ShipArea, (shipArea) => shipArea.project)
+  shipAreas: ShipArea[]
 }

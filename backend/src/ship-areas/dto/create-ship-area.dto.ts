@@ -2,6 +2,7 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -18,6 +19,9 @@ export class CreateShipAreaDto {
   @IsEnum(AreaType)
   @IsOptional()
   type?: AreaType;
+
+  @IsObject()
+  project: { id: string };
 
   @IsNumber()
   @Min(0)

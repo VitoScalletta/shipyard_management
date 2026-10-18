@@ -24,7 +24,7 @@ export default function ProjectDashboard() {
 
   // YENİ: Bölge Ekleme Modalı State'leri
   const [isNewZoneModalOpen, setIsNewZoneModalOpen] = useState(false);
-  const [zoneForm, setZoneForm] = useState({ name: '', parentId: '', size: '', unit: 'm2' });
+  const [zoneForm, setZoneForm] = useState({ name: '', parentId: '', size: '', unit: 'm²' });
   const [isZoneSaving, setIsZoneSaving] = useState(false);
 
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
@@ -150,6 +150,11 @@ export default function ProjectDashboard() {
   // YENİ: Bölge Oluşturma Fonksiyonu
   const handleCreateZone = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!project?.ship?.id) {
+      toast.error('Bu projeye bağlı gemi bulunamadığı için bölge oluşturulamadı.');
+      return;
+    }
+
     setIsZoneSaving(true);
     try {
       await api.post('/ship-areas', {
@@ -161,10 +166,11 @@ export default function ProjectDashboard() {
       });
       toast.success('Gemi bölgesi başarıyla oluşturuldu.');
       setIsNewZoneModalOpen(false);
-      setZoneForm({ name: '', parentId: '', size: '', unit: 'm2' });
+      setZoneForm({ name: '', parentId: '', size: '', unit: 'm²' });
       handleTaskUpdated(); // Bölgeleri yeniden yüklemek için tetikleyici
-    } catch (error) {
-      toast.error('Bölge eklenirken bir hata oluştu.');
+    } catch (error: any) {
+      const message = error.response?.data?.message;
+      toast.error(Array.isArray(message) ? message.join(', ') : message ?? 'Bölge eklenirken bir hata oluştu.');
     } finally {
       setIsZoneSaving(false);
     }
@@ -394,9 +400,11 @@ export default function ProjectDashboard() {
                   </label>
                   <label className="flex flex-col gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">Birim
                     <select value={zoneForm.unit} onChange={(e) => setZoneForm({...zoneForm, unit: e.target.value})} className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm text-slate-900 focus:border-cyan-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                      <option value="m2">Metrekare (m²)</option>
-                      <option value="m3">Metreküp (m³)</option>
-                      <option value="ton">Ton</option>
+                      <option value="m²">Metrekare (m²)</option>
+                      <option value="m³">Metreküp (m³)</option>
+                      <option value="m">Metre (m)</option>
+                      <option value="kg">Kilogram (kg)</option>
+                      <option value="adet">Adet</option>
                     </select>
                   </label>
                 </div>
@@ -411,7 +419,7 @@ export default function ProjectDashboard() {
         )}
       </AnimatePresence>
 
-      <NewTaskModal isOpen={isNewTaskModalOpen} onClose={() => setIsNewTaskModalOpen(false)} project={project} zones={zones.flatMap((zone) => [zone, ...(zone.subZones ?? [])])} onCreated={handleTaskUpdated} />
+      <NewTaskModal isOpen={isNewTaskModalOpen} onClose={() => setIsNewTaskModalOpen(false)} project={project} zones={zones.flatMap((zone) => [zone, ...(zone.subZones ?? [])])} tasks={tasks} onCreated={handleTaskUpdated} />
       <EditProjectModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} project={project} onUpdated={handleTaskUpdated} />
       <AnimatePresence>
         {isDeleteModalOpen && (
