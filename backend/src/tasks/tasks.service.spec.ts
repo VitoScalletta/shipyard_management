@@ -15,10 +15,12 @@ describe('TasksService', () => {
   // QueryBuilder Zinciri Mock'u (Kaynak hesaplamaları için)
   const mockQueryBuilder = {
     innerJoin: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     getRawMany: jest.fn(),
+    getMany: jest.fn(),
   };
 
   const mockTaskRepository = {
@@ -133,6 +135,24 @@ describe('TasksService', () => {
           ship: { id: 'ship-id' },
         }),
       );
+    });
+  });
+
+  describe('getUserTasks', () => {
+    it('matches first and last names using a safe alias and partial name', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.getUserTasks('Jokey');
+
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'task.assignedUsers',
+        'assignedUser',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        '(assignedUser.firstName ILIKE :name OR assignedUser.lastName ILIKE :name)',
+        { name: '%Jokey%' },
+      );
+      expect(mockQueryBuilder.getMany).toHaveBeenCalled();
     });
   });
 

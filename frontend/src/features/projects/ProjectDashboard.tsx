@@ -150,27 +150,21 @@ export default function ProjectDashboard() {
   // YENİ: Bölge Oluşturma Fonksiyonu
   const handleCreateZone = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!project?.ship?.id) {
-      toast.error('Bu projeye bağlı gemi bulunamadığı için bölge oluşturulamadı.');
-      return;
-    }
-
     setIsZoneSaving(true);
     try {
       await api.post('/ship-areas', {
         name: zoneForm.name,
-        shipId: project.ship.id,
-        parentAreaId: zoneForm.parentId || undefined,
+        project: { id: project.id },
+        parentArea: zoneForm.parentId ? { id: zoneForm.parentId } : undefined,
         size: zoneForm.size ? Number(zoneForm.size) : undefined,
         unit: zoneForm.unit
       });
       toast.success('Gemi bölgesi başarıyla oluşturuldu.');
       setIsNewZoneModalOpen(false);
-      setZoneForm({ name: '', parentId: '', size: '', unit: 'm²' });
-      handleTaskUpdated(); // Bölgeleri yeniden yüklemek için tetikleyici
-    } catch (error: any) {
-      const message = error.response?.data?.message;
-      toast.error(Array.isArray(message) ? message.join(', ') : message ?? 'Bölge eklenirken bir hata oluştu.');
+      setZoneForm({ name: '', parentId: '', size: '', unit: 'm2' });
+      handleTaskUpdated();
+    } catch (error) {
+      toast.error('Bölge eklenirken bir hata oluştu.');
     } finally {
       setIsZoneSaving(false);
     }

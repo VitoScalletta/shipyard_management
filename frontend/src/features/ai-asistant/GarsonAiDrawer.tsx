@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bot, X, Send, Command, Clock,
-  CheckCircle2, AlertOctagon
+  Bot, X, Send, Command, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -52,16 +51,28 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
 
     try {
       const { data: result } = await api.post('/garson/chat', { message: text });
-      const assistantContent = result?.data ?? result;
-      const content = typeof assistantContent === 'string'
-        ? assistantContent
-        : JSON.stringify(assistantContent, null, 2);
-      setMessages((prev) => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        type: 'text',
-        content,
-      }]);
+      const assistantData = result?.data ?? result;
+
+      if (assistantData && typeof assistantData === 'object' && 'type' in assistantData && 'content' in assistantData) {
+        setMessages((prev) => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'ai',
+          type: assistantData.type as MessageType,
+          content: assistantData.content,
+        }]);
+      }
+      else {
+        const content = typeof assistantData === 'string'
+          ? assistantData
+          : JSON.stringify(assistantData, null, 2);
+
+        setMessages((prev) => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'ai',
+          type: 'text',
+          content,
+        }]);
+      }
     } catch (error: any) {
       const message = error.response?.data?.message ?? 'Garson AI isteği başarısız oldu.';
       toast.error(Array.isArray(message) ? message.join(', ') : message);
@@ -76,32 +87,50 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
     }
   };
 
-  const renderMessageContent = (msg: Message) => {
+ const renderMessageContent = (msg: Message) => {
     if (msg.type === 'text') {
+      try {
+        let parsed = JSON.parse(msg.content);
+
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed = parsed[0];
+        }
+
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.status === 'error') {
+            return (
+              <div className="flex items-center gap-3 rounded-md border border-rose-500/20 bg-rose-500/10 p-3 text-rose-500 dark:bg-rose-950/30 dark:text-rose-400">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-sans text-xs font-bold uppercase tracking-wider">İşlem Başarısız ({parsed.intent})</span>
+                  <span className="font-sans text-sm">{parsed.message}</span>
+                </div>
+              </div>
+            );
+          }
+
+          if (parsed.status === 'success') {
+            return (
+              <div className="flex flex-col gap-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 p-3 dark:bg-cyan-950/30">
+                <span className="font-sans text-xs font-bold uppercase text-cyan-600 dark:text-cyan-400">
+                  Sistem Sorgu Sonucu ({parsed.intent})
+                </span>
+                <pre className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap overflow-auto">
+                  {parsed.data && parsed.data.length === 0 ? 'Kayıt bulunamadı.' : JSON.stringify(parsed.data, null, 2)}
+                </pre>
+              </div>
+            );
+          }
+
+          return <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto">{JSON.stringify(parsed, null, 2)}</pre>;
+        }
+      } catch (e) {
+        console.debug("Mesaj JSON formatında değil, düz metin olarak basılacak.");
+      }
+
       return <p className="font-sans text-sm leading-relaxed">{msg.content}</p>;
     }
 
-    if (msg.type === 'task_list') {
-      return (
-        <div className="flex w-full flex-col gap-2">
-          <p className="mb-1 font-sans text-sm text-slate-600 dark:text-slate-300">Taktiksel ağda tespit edilen sorunlu görevler:</p>
-          {msg.content.map((task: any) => (
-            <div key={task.id} className="flex cursor-pointer items-center justify-between rounded border p-2.5 transition-colors border-rose-200 bg-rose-50 hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-950/20 dark:hover:bg-rose-900/30">
-              <div className="flex items-center gap-2">
-                {task.status === 'BLOCKED' ? <AlertOctagon className="h-4 w-4 text-rose-500" /> : <Clock className="h-4 w-4 text-amber-500" />}
-                <div className="flex flex-col">
-                  <span className="font-sans text-xs font-bold text-slate-800 dark:text-slate-200">{task.name}</span>
-                  <span className="font-mono text-[9px] text-slate-500">Görev #{task.id}</span>
-                </div>
-              </div>
-              <span className={`font-mono text-[10px] font-bold ${task.status === 'BLOCKED' ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {task.delay}
-              </span>
-            </div>
-          ))}
-        </div>
-      );
-    }
 
     if (msg.type === 'action_success') {
       return (

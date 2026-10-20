@@ -334,8 +334,11 @@ export class TasksService {
   async getUserTasks(userName: string) {
     return this.taskRepository
       .createQueryBuilder('task')
-      .leftJoinAndSelect('task.assignedUsers', 'user')
-      .where('user.firstname ILIKE :name OR user.lastName ILIKE :name', {
-        name: `%${userName}`}).getMany();
+      .leftJoinAndSelect('task.assignedUsers', 'assignedUser')
+      .where(
+        '(assignedUser.firstName ILIKE :name OR assignedUser.lastName ILIKE :name)',
+        { name: `%${userName}%` },
+      )
+      .getMany();
   }
 }

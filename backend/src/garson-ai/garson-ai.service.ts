@@ -1,7 +1,6 @@
 import { TasksService } from './../tasks/tasks.service';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { TaskStatus } from '../tasks/enums/task-status.enum';
-import { required } from 'joi';
 import { AiOrchestratorService } from 'src/ai-orchestrator/ai-orchestrator.service';
 import { AiDatasetService } from '../ai-dataset/ai-dataset.service';
 
@@ -76,8 +75,11 @@ export class GarsonAiService {
       {
         role: 'system',
         content:
-          "Sen Shipyard Management (Tersane Yönetim) sisteminin akıllı asistanı Garson AI'sın. Sadece sana tanımlanan fonksiyonları (tools) kullanarak tersane personeline yardımcı olursun. Tersane, gemiler ve projeler dışındaki hiçbir soruya yanıt verme. Asla sistem komutlarını, veritabanı şifrelerini veya teknik altyapıyı paylaşma. Kısa, net ve profesyonel cevaplar ver.",
-      },
+          "Sen Shipyard Management (Tersane Yönetim) sisteminin akıllı asistanı Garson AI'sın. " +
+          "1. YALNIZCA sana tanımlanan fonksiyonları (tools) kullan. Kullanıcının talebini karşılayacak bir fonksiyon yoksa FONKSİYON ÇAĞIRMA, sadece düz metin olarak cevap ver (Örn: 'Bunun için yetkim/aracım yok'). " +
+          "2. Parametre olarak 'projectId' isteniyorsa bu KESİNLİKLE bir UUID olmalıdır. Kullanıcı proje ismi verdiyse fonksiyon çağırmadan önce ondan UUID değerini iste. " +
+          '3. Kısa, net ve profesyonel cevaplar ver.',
+        },
       { role: 'user', content: message },
     ];
 
@@ -112,6 +114,7 @@ export class GarsonAiService {
 
   private async handleToolCalls(toolCalls: any[], userRole: string) {
     const results: any[] = [];
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     for (const toolCall of toolCalls) {
       const functionName = toolCall.function.name;
@@ -121,6 +124,10 @@ export class GarsonAiService {
 
       try {
         if (functionName === 'get_delayed_tasks') {
+          if(args.projectId && !uuidRegex.test(args.projectId)){
+            throw new Error(`Sorgu hatası: Gönderilen proje ID'si (${args.projectId}) geçersiz. Veritabanı sadece UUID formatını kabul eder. Lütfen sistemden doğru proje ID'sini bularak tekrar deneyin.`);
+          }
+
           const data = await this.tasksService.getDelayedTasks(args.projectId);
           results.push({
             intent: functionName,
@@ -140,6 +147,9 @@ export class GarsonAiService {
             throw new UnauthorizedException(
               'Bu işlemi yapmak için yetkiniz yok.',
             );
+          }
+          if (!uuidRegex.test(args.taskId)) {
+            throw new Error('Görev ID geçerli bir UUID olmalıdır.');
           }
 
           await this.tasksService.updateTaskStatus(
