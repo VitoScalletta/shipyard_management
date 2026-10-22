@@ -18,7 +18,7 @@ export class AiOrchestratorService {
 
   private readonly OLLAMA_URL: string;
 
-  private readonly CHAT_MODEL = 'qwen2.5:3b';
+  private readonly CHAT_MODEL = 'qwen2.5:7b';
   private readonly ANALYST_MODEL = 'qwen2.5:7b';
 
   async routeToChatModel(messages: any[], tools?: any[]) {

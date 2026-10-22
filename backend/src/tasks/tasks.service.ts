@@ -222,7 +222,9 @@ export class TasksService {
       assignedUsers: assignedUserIds?.map((id) => ({ id })),
     });
     const savedTask = await this.taskRepository.save(task);
-    this.eventEmitter.emit('task.updated', { projectId: createTaskDto.projectId });
+    this.eventEmitter.emit('task.updated', {
+      projectId: createTaskDto.projectId,
+    });
     return savedTask;
   }
 
@@ -311,7 +313,7 @@ export class TasksService {
     return this.taskRepository
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.project', 'project')
-      .where('Task.id::text = :term OR task.name ILIKE :search', {
+      .where('CAST(task.id AS text) = :term OR task.name ILIKE :search', {
         term: searchTerm,
         search: `%${searchTerm}`,
       })
@@ -326,7 +328,7 @@ export class TasksService {
       .andWhere('task.plannedEndDate < :now', { now: new Date() });
 
     if (projectId) {
-      query.andWhere('task.projectId = :projectId', { projectId });
+      query.andWhere('project.id = :projectId', { projectId });
     }
     return query.getMany();
   }
@@ -335,6 +337,7 @@ export class TasksService {
     return this.taskRepository
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.assignedUsers', 'assignedUser')
+      .leftJoinAndSelect('task.project', 'project')
       .where(
         '(assignedUser.firstName ILIKE :name OR assignedUser.lastName ILIKE :name)',
         { name: `%${userName}%` },

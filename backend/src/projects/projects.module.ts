@@ -9,5 +9,6 @@ import { ShipArea } from '../ship-areas/entities/ship-area.entity';
   imports: [TypeOrmModule.forFeature([Project, ShipArea])],
   controllers: [ProjectsController],
   providers: [ProjectsService],
+  exports: [ProjectsService],
 })
 export class ProjectsModule {}

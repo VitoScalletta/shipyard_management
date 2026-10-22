@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bot, X, Send, Command, CheckCircle2, AlertTriangle
+  Bot, X, Send, Command, AlertTriangle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -11,7 +11,18 @@ interface GarsonAiDrawerProps {
   onClose: () => void;
 }
 
-type MessageType = 'text' | 'task_list' | 'action_success';
+type MessageType = 'text' | 'task_list' | 'action_success' | 'project_summary';
+
+interface ProjectSummary {
+  activeCount: number;
+  projects: Array<{
+    id: string;
+    name: string;
+    code?: string;
+    status: string;
+    plannedDeliveryDate?: string;
+  }>;
+}
 
 interface Message {
   id: string;
@@ -22,9 +33,8 @@ interface Message {
 
 const QUICK_PROMPTS = [
   "Geciken görevleri göster",
-  "⚡ Kritik yoldaki darboğazlar neler?",
-  "👷 Bugün hangi ekipte aşırı yük var?",
   "Aktif projelerin özetini çıkar",
+  "Ahmet'in görevlerini göster",
   "Bir görevin durumunu nasıl güncelleyebilirim?"
 ];
 
@@ -87,7 +97,44 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
     }
   };
 
- const renderMessageContent = (msg: Message) => {
+const renderMessageContent = (msg: Message) => {
+    if (msg.type === 'project_summary') {
+      const summary = msg.content as ProjectSummary;
+      const statusLabels: Record<string, string> = {
+        PLANNING: 'PLANLANIYOR',
+        IN_PROGRESS: 'DEVAM EDİYOR',
+        ON_HOLD: 'BEKLEMEDE',
+      };
+
+      if (!summary.activeCount) {
+        return <p className="font-sans text-sm leading-relaxed">Şu anda aktif proje bulunmuyor.</p>;
+      }
+
+      return (
+        <div className="flex w-full flex-col gap-2">
+          <span className="font-sans text-xs font-bold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">
+            Aktif Projeler · {summary.activeCount}
+          </span>
+          <div className="flex max-h-[300px] flex-col gap-2 overflow-y-auto pr-1">
+            {summary.projects.map((project) => (
+              <div key={project.id || project.name} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700/50 dark:bg-slate-800/50">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-sans text-xs font-bold leading-tight text-slate-800 dark:text-slate-200">{project.name}</span>
+                  <span className="shrink-0 rounded bg-cyan-100 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300">
+                    {statusLabels[project.status] ?? project.status}
+                  </span>
+                </div>
+                {project.code && <span className="mt-1 block font-mono text-[10px] text-slate-500 dark:text-slate-400">{project.code}</span>}
+                <span className="mt-2 block font-sans text-[11px] text-slate-500 dark:text-slate-400">
+                  Planlanan teslim: {project.plannedDeliveryDate ? new Date(project.plannedDeliveryDate).toLocaleDateString('tr-TR') : 'Belirtilmedi'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (msg.type === 'text') {
       try {
         let parsed = JSON.parse(msg.content);
@@ -110,14 +157,40 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
           }
 
           if (parsed.status === 'success') {
+            const tasks = parsed.data;
+
+            if (!tasks || tasks.length === 0) {
+              return (
+                <div className="flex flex-col gap-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 p-3 dark:bg-cyan-950/30">
+                  <span className="font-sans text-xs font-bold uppercase text-cyan-600 dark:text-cyan-400">Sistem Sorgu Sonucu ({parsed.intent})</span>
+                  <span className="font-sans text-sm text-slate-600 dark:text-slate-300">Bu kritere uygun kayıt bulunamadı.</span>
+                </div>
+              );
+            }
+
             return (
-              <div className="flex flex-col gap-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 p-3 dark:bg-cyan-950/30">
+              <div className="flex w-full flex-col gap-2 mt-1">
                 <span className="font-sans text-xs font-bold uppercase text-cyan-600 dark:text-cyan-400">
-                  Sistem Sorgu Sonucu ({parsed.intent})
+                  Bulunan Görevler ({tasks.length})
                 </span>
-                <pre className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap overflow-auto">
-                  {parsed.data && parsed.data.length === 0 ? 'Kayıt bulunamadı.' : JSON.stringify(parsed.data, null, 2)}
-                </pre>
+                <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+                  {tasks.map((task: any) => (
+                    <div key={task.id} className="flex flex-col gap-1.5 rounded-md border p-3 transition-colors border-slate-200 bg-white shadow-sm dark:border-slate-700/50 dark:bg-slate-800/50">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-sans text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">{task.name}</span>
+                        <span className={`shrink-0 font-mono text-[9px] font-bold px-1.5 py-0.5 rounded ${task.status === 'DELAYED' ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                          {task.status}
+                        </span>
+                      </div>
+                      {task.project?.name && (
+                        <span className="font-sans text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                          Proje: {task.project.name}
+                        </span>
+                      )}
+                      <span className="font-mono text-[9px] text-slate-400 dark:text-slate-500">Bitiş: {task.plannedEndDate ? new Date(task.plannedEndDate).toLocaleDateString('tr-TR') : 'Belirtilmedi'}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           }
@@ -125,28 +198,12 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
           return <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto">{JSON.stringify(parsed, null, 2)}</pre>;
         }
       } catch (e) {
-        console.debug("Mesaj JSON formatında değil, düz metin olarak basılacak.");
+        // Kod buraya düşerse mesaj JSON değil, düz metindir.
       }
 
       return <p className="font-sans text-sm leading-relaxed">{msg.content}</p>;
     }
 
-
-    if (msg.type === 'action_success') {
-      return (
-        <div className="flex w-full flex-col gap-2 rounded-lg border p-3 border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-5 w-5" />
-            <span className="font-sans text-sm font-bold uppercase tracking-wider">Aksiyon Onaylandı</span>
-          </div>
-          <p className="font-sans text-xs text-emerald-700 dark:text-emerald-100/80">{msg.content.message}</p>
-          <div className="mt-1 flex items-center justify-between rounded px-2 py-1 border border-emerald-200 bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/50">
-             <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-500/70">#{msg.content.taskId}</span>
-             <span className="font-sans text-xs font-bold text-emerald-700 dark:text-emerald-400">{msg.content.taskName}</span>
-          </div>
-        </div>
-      );
-    }
   };
 
   return (
@@ -178,7 +235,7 @@ export default function GarsonAiDrawer({ isOpen, onClose }: GarsonAiDrawerProps)
                 </div>
                 <div className="flex flex-col">
                   <h2 className="font-sans text-base font-bold text-slate-900 dark:text-slate-100">Garson AI</h2>
-                  <span className="font-mono text-[10px] text-cyan-600 dark:text-cyan-500">v1.2 (QWEN-3B-LOCAL)</span>
+                  <span className="font-mono text-[10px] text-cyan-600 dark:text-cyan-500">Qwen 2.5 7B · Yerel</span>
                 </div>
               </div>
 
