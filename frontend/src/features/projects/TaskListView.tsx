@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckSquare, Clock, MapPin, Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import TaskAssigneeControl from './TaskAssigneeControl';
 
 interface TaskListViewProps {
   tasks: any[];
@@ -54,6 +55,7 @@ export default function TaskListView({ tasks, onTaskUpdated }: TaskListViewProps
             <th className="px-4 py-3 font-medium">Görev Adı</th>
             <th className="px-4 py-3 font-medium">Bölge (Zone)</th>
             <th className="px-4 py-3 font-medium">Tarih</th>
+            <th className="px-4 py-3 font-medium text-right">Personel</th>
             <th className="px-4 py-3 font-medium text-right">Etiket</th>
           </tr>
         </thead>
@@ -121,6 +123,10 @@ export default function TaskListView({ tasks, onTaskUpdated }: TaskListViewProps
                       <Clock className="h-3 w-3" />
                       {task.startDate ? new Date(task.startDate).toLocaleDateString('tr-TR') : 'Belirtilmedi'}
                     </div>
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <TaskAssigneeControl task={task} onUpdated={onTaskUpdated} />
                   </td>
 
                   {/* Hızlı Durum Değiştirici (Rozet yerine Dropdown gibi çalışan bir select) */}

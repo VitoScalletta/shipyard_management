@@ -8,6 +8,7 @@ import AiRiskCenter from '@/features/ai-risk/AiRiskCenter';
 import WorkforceDashboard from "./features/workforce/WorkforceDashboard";
 import WorkerDashboard from "./features/workforce/WorkerDashboard.tsx";
 import SystemAuditDashboard from "./features/admin/SystemAuditDashboard";
+import AnalyticsDashboard from './features/admin/AnalyticsDashboard.tsx';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -41,6 +42,7 @@ function App() {
           <Route path="worker-board" element={<WorkerDashboard />} />
           <Route path="audit-log" element={<SystemAuditDashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
         </Route>
       </Routes>
     </Router>

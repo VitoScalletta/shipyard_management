@@ -1,13 +1,21 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { ReactFlow, Background, Controls, Handle, Position, ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  Handle,
+  Position,
+  ReactFlowProvider,
+  useReactFlow,
+  MarkerType
+} from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { Clock, Users, AlertOctagon, CheckCircle2, Activity } from 'lucide-react';
 import TaskDetailDrawer from './TaskDetailDrawer';
-import { useTheme } from '@/contexts/ThemeContext'; // YENİ: Tema eklendi
+import { useTheme } from '@/contexts/ThemeContext';
 
-// 1. ÖZEL DÜĞÜM TASARIMI (ESKİ EFSANE TASARIM + BEYAZ TEMA UYUMU)
 const TaskNode = ({ data }: { data: any }) => {
   const isCritical = data.isCritical;
   const { theme } = useTheme();
@@ -17,7 +25,7 @@ const TaskNode = ({ data }: { data: any }) => {
       switch (data.status) {
         case 'COMPLETED': return 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm';
         case 'IN_PROGRESS': return 'border-cyan-300 bg-cyan-50 text-cyan-700 shadow-sm';
-        case 'DELAYED': return 'border-amber-300 bg-amber-50 text-amber-700 shadow-sm';
+        case 'DELAYED': return 'border-amber-400 bg-amber-50 text-amber-700 shadow-[0_0_15px_rgba(245,158,11,0.3)]'; // Gecikmeliye parlama eklendi
         case 'BLOCKED': return 'border-rose-400 bg-rose-50 text-rose-700 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse';
         default: return 'border-slate-200 bg-white text-slate-600 shadow-sm';
       }
@@ -25,8 +33,8 @@ const TaskNode = ({ data }: { data: any }) => {
       switch (data.status) {
         case 'COMPLETED': return 'border-emerald-500/50 bg-emerald-950/20 text-emerald-500';
         case 'IN_PROGRESS': return 'border-cyan-500/50 bg-cyan-950/20 text-cyan-400';
-        case 'DELAYED': return 'border-amber-500/50 bg-amber-950/20 text-amber-500';
-        case 'BLOCKED': return 'border-rose-500/80 bg-rose-950/30 text-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse';
+        case 'DELAYED': return 'border-amber-500/80 bg-amber-950/40 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)]'; // Gecikmeliye parlama eklendi
+        case 'BLOCKED': return 'border-rose-500/80 bg-rose-950/30 text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)] animate-pulse';
         default: return 'border-slate-700 bg-slate-900/50 text-slate-400';
       }
     }
@@ -43,7 +51,7 @@ const TaskNode = ({ data }: { data: any }) => {
   };
 
   return (
-    <div className={`relative w-64 rounded-lg border-2 p-3 backdrop-blur-md transition-all hover:scale-105 ${getStatusStyles()} ${isCritical && data.status !== 'COMPLETED' ? (theme === 'light' ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]') : ''}`}>
+    <div className={`relative w-64 rounded-lg border-2 p-3 backdrop-blur-md transition-all hover:scale-105 ${getStatusStyles()} ${isCritical && data.status !== 'COMPLETED' ? (theme === 'light' ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)]' : 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]') : ''}`}>
       <Handle type="target" position={Position.Left} className={`!h-3 !w-3 !border-2 ${theme === 'light' ? '!border-white !bg-slate-400' : '!border-slate-900 !bg-slate-400'}`} />
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between">
@@ -61,7 +69,6 @@ const TaskNode = ({ data }: { data: any }) => {
   );
 };
 
-// 2. DAGRE HİZALAMASI (Aynı)
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
@@ -76,7 +83,6 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges };
 };
 
-// 3. İÇ KAMERA BİLEŞENİ
 function FlowContent({ focusedNodeId, tasks, dependencies, onTaskUpdated }: any) {
   const { theme } = useTheme();
   const nodeTypes = useMemo(() => ({ taskNode: TaskNode }), []);
@@ -96,13 +102,59 @@ function FlowContent({ focusedNodeId, tasks, dependencies, onTaskUpdated }: any)
         isCritical: task.isCritical ?? false,
       },
     }));
-    const edges: Edge[] = dependencies.map(({ predecessor, successor }: any) => ({
-      id: `${predecessor.id}-${successor.id}`,
-      source: predecessor.id,
-      target: successor.id,
-      animated: true,
-      style: { stroke: theme === 'light' ? '#94a3b8' : '#475569', strokeWidth: 2 },
-    }));
+
+    const edges: Edge[] = dependencies.map(({ predecessor, successor }: any) => {
+      const predNode = tasks.find((t: any) => t.id === predecessor.id);
+      const succNode = tasks.find((t: any) => t.id === successor.id);
+
+      const isBlocked = predNode?.status === 'BLOCKED' || succNode?.status === 'BLOCKED';
+      const isDelayed = predNode?.status === 'DELAYED' || succNode?.status === 'DELAYED';
+      const isCritical = predNode?.isCritical || succNode?.isCritical;
+      const isCompleted = predNode?.status === 'COMPLETED';
+
+      let edgeColor = theme === 'light' ? '#cbd5e1' : '#334155';
+      let edgeWidth = 2;
+      let animated = true;
+      let zIndex = 0;
+
+      if (isBlocked) {
+        edgeColor = theme === 'light' ? '#f43f5e' : '#e11d48';
+        edgeWidth = 3;
+        zIndex = 10;
+      } else if (isDelayed) {
+        edgeColor = theme === 'light' ? '#f59e0b' : '#d97706';
+        edgeWidth = 3;
+        zIndex = 5;
+      } else if (isCritical) {
+        edgeColor = theme === 'light' ? '#06b6d4' : '#0891b2';
+        edgeWidth = 2.5;
+        zIndex = 2;
+      } else if (isCompleted) {
+        edgeColor = theme === 'light' ? '#10b981' : '#059669';
+        animated = false;
+      }
+
+      return {
+        id: `${predecessor.id}-${successor.id}`,
+        source: predecessor.id,
+        target: successor.id,
+        type: 'smoothstep',
+        animated,
+        zIndex,
+        style: {
+          stroke: edgeColor,
+          strokeWidth: edgeWidth,
+          filter: (isBlocked || isDelayed) ? `drop-shadow(0 0 4px ${edgeColor})` : 'none'
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 15,
+          height: 15,
+          color: edgeColor,
+        },
+      };
+    });
+
     return getLayoutedElements(nodes, edges);
   }, [tasks, dependencies, theme]);
 
@@ -122,7 +174,6 @@ function FlowContent({ focusedNodeId, tasks, dependencies, onTaskUpdated }: any)
 
   return (
     <>
-      {/* TEMA CSS OVERRIDE */}
       <style>{`
         .react-flow { background-color: transparent !important; }
         .react-flow__controls-button {
@@ -132,7 +183,14 @@ function FlowContent({ focusedNodeId, tasks, dependencies, onTaskUpdated }: any)
         }
         .react-flow__controls-button:hover { background-color: ${theme === 'dark' ? '#334155' : '#f1f5f9'} !important; }
       `}</style>
-      <ReactFlow nodes={layoutedNodes} edges={layoutedEdges} nodeTypes={nodeTypes} onNodeClick={onNodeClick} fitView proOptions={{ hideAttribution: true }}>
+      <ReactFlow
+        nodes={layoutedNodes}
+        edges={layoutedEdges}
+        nodeTypes={nodeTypes}
+        onNodeClick={onNodeClick}
+        fitView
+        proOptions={{ hideAttribution: true }}
+      >
         <Background gap={40} color={theme === 'dark' ? '#334155' : '#cbd5e1'} size={1.5} />
         <Controls className="overflow-hidden rounded-md border border-slate-200 shadow-sm dark:border-slate-800 dark:shadow-[0_0_15px_rgba(0,0,0,0.5)]" />
       </ReactFlow>
@@ -141,7 +199,6 @@ function FlowContent({ focusedNodeId, tasks, dependencies, onTaskUpdated }: any)
   );
 }
 
-// 4. DIŞA AKTARILAN ANA BİLEŞEN
 export default function CriticalPathGraph(props: any) {
   return (
     <div className="h-full w-full">

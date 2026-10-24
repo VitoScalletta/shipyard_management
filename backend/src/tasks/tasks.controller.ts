@@ -18,6 +18,7 @@ import { Role } from '../users/entities/user.entity';
 import { TaskStatus } from './enums/task-status.enum';
 import { AssignResourceDto } from './dto/assign-resource.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateTaskAssigneesDto } from './dto/update-task-assignees.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,6 +46,15 @@ export class TasksController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.ENGINEER, Role.WORKER)
   updateTask(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
     return this.taskService.updateTask(id, updateTaskDto);
+  }
+
+  @Patch(':id/assignees')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.ENGINEER)
+  updateAssignees(
+    @Param('id') id: string,
+    @Body() body: UpdateTaskAssigneesDto,
+  ) {
+    return this.taskService.updateAssignees(id, body.userIds);
   }
 
   @Get()

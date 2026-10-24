@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   Ship, Bot, LogOut, Menu, ChevronRight,
   BrainCircuit, Users, ShieldCheck,
-  Sun, Moon // İkonlar eklendi
+  Sun, Moon, Activity // İkonlar eklendi
 } from 'lucide-react';
 import GarsonAiDrawer from '../ai-asistant/GarsonAiDrawer';
 import { Toaster } from 'sonner';
@@ -128,6 +128,20 @@ export default function DashboardLayout() {
             <ShieldCheck className="h-5 w-5 shrink-0" />
             <span className={`overflow-hidden whitespace-nowrap font-sans font-medium transition-all duration-300 ${isSidebarOpen ? 'ml-3 max-w-[200px] opacity-100 delay-150' : 'max-w-0 opacity-0'}`}>
               Sistem & Denetim
+            </span>
+          </NavLink>
+          <NavLink
+            to="/analytics"
+            onClick={() => window.innerWidth < 768 && setIsSidebarOpen(false)}
+            className={({ isActive }) => `flex items-center rounded-lg p-2.5 transition-colors ${
+              isActive
+                ? (theme === 'dark' ? 'bg-slate-800 text-cyan-400 shadow-[inset_3px_0_0_0_rgba(6,182,212,1)]' : 'bg-cyan-50 text-cyan-600 shadow-[inset_3px_0_0_0_rgba(6,182,212,1)]')
+                : (theme === 'dark' ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900')
+            } ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}
+          >
+            <Activity className="h-5 w-5 shrink-0" />
+            <span className={`overflow-hidden whitespace-nowrap font-sans font-medium transition-all duration-300 ${isSidebarOpen ? 'ml-3 max-w-[200px] opacity-100 delay-150' : 'max-w-0 opacity-0'}`}>
+              Yönetici Özeti
             </span>
           </NavLink>
         </nav>

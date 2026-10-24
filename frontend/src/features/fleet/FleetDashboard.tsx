@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 import { api } from '@/lib/api';
-import { toast } from 'sonner';
 import NewProjectModal from './NewProjectModal';
 
 export interface ShipProject {
@@ -44,7 +43,16 @@ const PROJECT_TYPES: Record<string, string> = {
   RETROFIT: 'Modernizasyon',
 };
 
-// ŞIK VE ANİMASYONLU ÖZEL DROPDOWN BİLEŞENİ (TEMAYA DUYARLI)
+const STATUS_LABELS: Record<string, string> = {
+  PLANNING: 'PLANLANIYOR',
+  IN_PROGRESS: 'DEVAM EDİYOR',
+  ON_HOLD: 'BEKLEMEDE',
+  COMPLETED: 'TAMAMLANDI',
+  CANCELLED: 'İPTAL EDİLDİ',
+  DELAYED: 'GECİKMELİ',
+  BLOCKED: 'BLOKE',
+};
+
 function CustomDropdown({ value, onChange, options, icon: Icon, minWidth = '160px' }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const selected = options.find((o: any) => o.value === value);
@@ -142,8 +150,7 @@ export default function FleetDashboard() {
         const response = await api.get('/tasks');
         tasks = response.data;
       } catch (error) {
-        console.error('Görev verileri yüklenemedi; filo ilerlemesi proje kayıtlarından gösterilecek:', error);
-        toast.error('Görev verileri yüklenemedi. Proje kayıtlarındaki ilerleme gösteriliyor.');
+        console.error('Görev verileri yüklenemedi:', error);
       }
       const mappedProjects = (data as ProjectRecord[]).map((project) => {
         const projectTasks = tasks.filter((task) => task.project?.id === project.id);
@@ -169,9 +176,7 @@ export default function FleetDashboard() {
       });
       setProjects(mappedProjects);
     } catch (error) {
-      console.error('Projeler çekilemedi:', error);
       setLoadError('Projeler yüklenemedi. Backend bağlantısını kontrol edip yeniden deneyin.');
-      toast.error('Sunucu bağlantısı kurulamadı.');
     } finally {
       setIsLoading(false);
     }
@@ -212,8 +217,6 @@ export default function FleetDashboard() {
 
   return (
     <div className="relative flex h-full flex-col gap-6 overflow-hidden z-0">
-
-      {/* Üst Başlık ve Aksiyon */}
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-600 shadow-[0_0_15px_rgba(6,182,212,0.15)] dark:border-cyan-900/50 dark:bg-cyan-950/30 dark:text-cyan-500">
@@ -240,10 +243,8 @@ export default function FleetDashboard() {
         </button>
       </div>
 
-      {/* KONTROL PANELİ (FİLTRE & SIRALAMA) */}
       <div className="relative z-20 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/80 p-3 shrink-0 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60">
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Akıllı Arama */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             <input
@@ -263,7 +264,6 @@ export default function FleetDashboard() {
         </div>
       </div>
 
-      {/* Gemi Listesi Alanı */}
       <div className="flex-1 overflow-y-auto pb-6 pr-2">
         {isLoading && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -338,22 +338,23 @@ export default function FleetDashboard() {
                         <Ship className="h-5 w-5" />
                       </div>
                       <div className="flex flex-col">
-                        <h3 className="font-sans text-lg font-bold transition-colors line-clamp-1 text-slate-800 group-hover:text-cyan-600 dark:text-slate-100 dark:group-hover:text-cyan-400" title={ship.name}>{ship.name}</h3>
-                        <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500">
+                        <h3 className="font-sans text-lg font-bold transition-colors truncate w-48 sm:w-56 text-slate-800 group-hover:text-cyan-600 dark:text-slate-100 dark:group-hover:text-cyan-400" title={ship.name}>{ship.name}</h3>
+                        <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 mt-1">
                           <span className="flex items-center gap-1.5">
-                            <span className={`h-1.5 w-1.5 rounded-full ${ship.status === 'COMPLETED' ? 'bg-emerald-500' : ship.status === 'DELAYED' ? 'bg-amber-500' : 'bg-cyan-500'}`}></span>
-                            {PROJECT_TYPES[ship.type] || ship.type} · {ship.status}
+                            <span>{PROJECT_TYPES[ship.type] || ship.type}</span>
+                            <span className="text-slate-300 dark:text-slate-700">•</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider ${
+                              ship.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                              ship.status === 'DELAYED' || ship.status === 'BLOCKED' ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' :
+                              'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-400'
+                            }`}>
+                              {STATUS_LABELS[ship.status] || ship.status}
+                            </span>
                           </span>
-                          {ship.ship?.imoNumber && (
-                            <>
-                              <span>•</span>
-                              <span>IMO: {ship.ship.imoNumber}</span>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>
-                    {ship.health === 'CRITICAL' && <span title="Kritik Darboğaz"><AlertTriangle className="h-5 w-5 animate-pulse text-rose-500" /></span>}
+                    {ship.health === 'CRITICAL' && <span title="Kritik Darboğaz"><AlertTriangle className="h-5 w-5 text-rose-500" /></span>}
                     {ship.health === 'WARNING' && <span title="Uyarı"><ShieldAlert className="h-5 w-5 text-amber-500" /></span>}
                   </div>
 
@@ -362,20 +363,27 @@ export default function FleetDashboard() {
                       <span className="text-slate-500 dark:text-slate-400">PROJE İLERLEMESİ</span>
                       <span className="font-bold text-cyan-600 dark:text-cyan-400">%{progress}</span>
                     </div>
-                    <div className="flex h-2 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-950">
+
+                    {/* ORİJİNAL, TEMİZ VE KLASİK PROGRESS BAR */}
+                    <div className="flex h-2 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-950/50">
                       <div
-                        className={`h-full ${ship.health === 'CRITICAL' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : ship.health === 'WARNING' ? 'bg-amber-500' : 'bg-cyan-500'}`}
+                        className={`h-full transition-all duration-500 ease-out ${
+                          ship.health === 'CRITICAL' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]' :
+                          ship.health === 'WARNING' ? 'bg-amber-500' :
+                          'bg-cyan-500'
+                        }`}
                         style={{ width: `${progress}%` }}
                       />
                     </div>
+
                   </div>
 
                   <div className="mt-5 flex items-center justify-between font-mono text-xs">
-                    <div className="flex items-center gap-2 flex-1 mr-2 text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-2 flex-1 mr-2 text-slate-500 dark:text-slate-400 min-w-0">
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold border border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {initials}
                       </div>
-                      <span className="line-clamp-1 flex-1 text-slate-700 dark:text-slate-200" title={manager}>{manager}</span>
+                      <span className="truncate text-slate-700 dark:text-slate-200" title={manager}>{manager}</span>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 text-slate-500 dark:text-slate-400">

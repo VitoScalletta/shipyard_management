@@ -6,13 +6,14 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from './entities/task.entity';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { TaskDependency } from './entities/task-dependency.entity';
 import { CreateTaskDependencyDto } from './dto/create-task-dependency.dto';
 import { TaskStatus } from './enums/task-status.enum';
 import { TaskResource } from './entities/task-resource.entity';
 import { Resource } from '../resources/entities/resource.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class TasksService {
@@ -25,6 +26,8 @@ export class TasksService {
     private taskResourceRepository: Repository<TaskResource>,
     @InjectRepository(Resource)
     private resourceRepository: Repository<Resource>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private eventEmitter: EventEmitter2,
   ) {}
 
@@ -182,6 +185,35 @@ export class TasksService {
     return savedTask;
   }
 
+  async updateAssignees(taskId: string, userIds: string[]) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+      relations: { project: true },
+    });
+
+    if (!task) throw new NotFoundException('Görev bulunamadı');
+
+    const users = userIds.length
+      ? await this.userRepository.findBy({ id: In(userIds) })
+      : [];
+
+    if (users.length !== userIds.length) {
+      throw new BadRequestException(
+        'Seçilen personellerden biri veya birkaçı bulunamadı.',
+      );
+    }
+
+    task.assignedUsers = users;
+
+    const savedTask = await this.taskRepository.save(task);
+
+    if (savedTask.project?.id) {
+      this.eventEmitter.emit('task.updated', { projectId: savedTask.project.id });
+    }
+
+    return savedTask;
+  }
+
   validateTaskDateAndMetrics(
     startDate?: Date,
     endDate?: Date,
@@ -325,7 +357,13 @@ export class TasksService {
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.project', 'project')
       .where('task.status != :completed', { completed: TaskStatus.COMPLETED })
-      .andWhere('task.plannedEndDate < :now', { now: new Date() });
+      .andWhere('task.status != :cancelled', {
+        cancelled: TaskStatus.CANCELLED,
+      })
+      .andWhere('(task.status = :delayed OR task.plannedEndDate < :now)', {
+        delayed: TaskStatus.DELAYED,
+        now: new Date(),
+      });
 
     if (projectId) {
       query.andWhere('project.id = :projectId', { projectId });

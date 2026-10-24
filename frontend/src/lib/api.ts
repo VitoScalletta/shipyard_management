@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 
 // Docker Compose API is published on port 3001; override for a locally started API.
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },

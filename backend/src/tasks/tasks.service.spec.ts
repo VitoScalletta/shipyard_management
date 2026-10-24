@@ -7,6 +7,7 @@ import { Task } from './entities/task.entity';
 import { TaskDependency } from './entities/task-dependency.entity';
 import { TaskResource } from './entities/task-resource.entity';
 import { Resource } from '../resources/entities/resource.entity';
+import { User } from '../users/entities/user.entity';
 import { TaskStatus } from './enums/task-status.enum';
 
 describe('TasksService', () => {
@@ -46,6 +47,10 @@ describe('TasksService', () => {
     findOne: jest.fn(),
   };
 
+  const mockUserRepository = {
+    findBy: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -63,6 +68,7 @@ describe('TasksService', () => {
           provide: getRepositoryToken(Resource),
           useValue: mockResourceRepository,
         },
+        { provide: getRepositoryToken(User), useValue: mockUserRepository },
         {
           provide: EventEmitter2,
           useValue: {
@@ -156,6 +162,39 @@ describe('TasksService', () => {
     });
   });
 
+  describe('getDelayedTasks', () => {
+    it('includes tasks explicitly marked delayed and excludes completed or cancelled tasks', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.getDelayedTasks();
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'task.status != :completed',
+        { completed: TaskStatus.COMPLETED },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'task.status != :cancelled',
+        { cancelled: TaskStatus.CANCELLED },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(task.status = :delayed OR task.plannedEndDate < :now)',
+        expect.objectContaining({ delayed: TaskStatus.DELAYED }),
+      );
+      expect(mockQueryBuilder.getMany).toHaveBeenCalled();
+    });
+
+    it('filters delayed tasks by project when a project ID is provided', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.getDelayedTasks('project-1');
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'project.id = :projectId',
+        { projectId: 'project-1' },
+      );
+    });
+  });
+
   describe('addDependency', () => {
     it('görev kendisine bağımlıysa hata fırlatmalıdır', async () => {
       await expect(
@@ -233,6 +272,28 @@ describe('TasksService', () => {
       const result = await service.updateTaskStatus('1', TaskStatus.COMPLETED);
       expect(result.status).toBe(TaskStatus.COMPLETED);
       expect(result.actualEndDate).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('updateAssignees', () => {
+    it('göreve seçili personelleri atayıp proje güncelleme olayı yayınlar', async () => {
+      const task = { id: 'task-1', project: { id: 'project-1' }, assignedUsers: [] };
+      const users = [{ id: 'user-1' }, { id: 'user-2' }];
+      mockTaskRepository.findOne.mockResolvedValue(task);
+      mockUserRepository.findBy.mockResolvedValue(users);
+      mockTaskRepository.save.mockResolvedValue({ ...task, assignedUsers: users });
+
+      const result = await service.updateAssignees('task-1', ['user-1', 'user-2']);
+
+      expect(result.assignedUsers).toEqual(users);
+      expect(mockTaskRepository.save).toHaveBeenCalledWith({ ...task, assignedUsers: users });
+    });
+
+    it('olmayan personel seçildiğinde hata döndürür', async () => {
+      mockTaskRepository.findOne.mockResolvedValue({ id: 'task-1', project: { id: 'project-1' } });
+      mockUserRepository.findBy.mockResolvedValue([{ id: 'user-1' }]);
+
+      await expect(service.updateAssignees('task-1', ['user-1', 'user-2'])).rejects.toThrow(BadRequestException);
     });
   });
 

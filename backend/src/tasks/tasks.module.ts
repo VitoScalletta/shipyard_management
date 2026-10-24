@@ -7,6 +7,7 @@ import { TaskDependency } from './entities/task-dependency.entity';
 import { TaskResource } from './entities/task-resource.entity';
 import { Resource } from 'src/resources/entities/resource.entity';
 import { Team } from 'src/workforce/entities/team.entity';
+import { User } from 'src/users/entities/user.entity';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Team } from 'src/workforce/entities/team.entity';
       TaskResource,
       Resource,
       Team,
+      User,
     ]),
   ],
   controllers: [TasksController],

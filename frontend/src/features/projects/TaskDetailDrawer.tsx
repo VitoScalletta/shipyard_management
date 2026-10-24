@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { useTheme } from '@/contexts/ThemeContext';
+import TaskAssigneeControl from './TaskAssigneeControl';
 import {
   X, Clock, Users, Wrench,
-  CheckCircle2, Activity, AlertOctagon, ShieldAlert
+  CheckCircle2, Activity, AlertOctagon, ShieldAlert, Undo
 } from 'lucide-react';
 
 interface TaskDetailDrawerProps {
@@ -57,6 +58,26 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
     }
   };
 
+  // YENİ EKLENEN FONKSİYON: Tamamlanan görevi geri almak için
+  const revertTask = async () => {
+    try {
+      await api.patch(`/tasks/${task.id}/status`, { status: 'IN_PROGRESS' });
+      toast.success('Görev geri alındı (Devam Ediyor).');
+      onTaskUpdated();
+      onClose();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message ?? 'Görev durumu geri alınamadı.';
+
+      if (errorMessage.includes('BLOCKED')) {
+        toast.warning('Öncül görevler tamamlanmadığı için görev BLOKE edildi.');
+        onTaskUpdated();
+        onClose();
+      } else {
+        toast.error(errorMessage);
+      }
+    }
+  };
+
   const assignResource = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsAssigningResource(true);
@@ -74,6 +95,7 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
       setIsAssigningResource(false);
     }
   };
+
   // Görev durumuna göre renk ve ikon seçimi
   const getStatusConfig = (status: string) => {
     const light = theme === 'light';
@@ -93,7 +115,6 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
     <AnimatePresence>
       {isOpen && task && (
         <>
-          {/* Arka Plan Karartması (Backdrop) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -102,7 +123,6 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
             className="fixed inset-0 z-40 bg-slate-900/25 backdrop-blur-sm dark:bg-slate-950/60"
           />
 
-          {/* Sağdan Açılan Çekmece */}
           <motion.div
             initial={{ x: '100%', boxShadow: '-20px 0 50px rgba(0,0,0,0)' }}
             animate={{ x: 0, boxShadow: '-20px 0 50px rgba(0,0,0,0.5)' }}
@@ -110,14 +130,12 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col border-l border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
           >
-            {/* Taktiksel Sol Çizgi Vurgusu */}
             <div className={`absolute bottom-0 left-0 top-0 w-1 ${config.bg.replace('/10', '').replace('/30', '')}`} />
 
-            {/* Başlık Alanı */}
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-5 pl-6 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex flex-col gap-1">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Görev Detayı</span>
-                <h2 className="font-sans text-lg font-bold text-slate-900 dark:text-slate-100">{task.label}</h2>
+                <h2 className="font-sans text-lg font-bold text-slate-900 dark:text-slate-100">{task.name || task.label}</h2>
               </div>
               <button
                 onClick={onClose}
@@ -127,11 +145,9 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
               </button>
             </div>
 
-            {/* Çekmece İçeriği */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex flex-col gap-6">
 
-                {/* Durum Rozeti */}
                 <div className={`flex items-center gap-3 rounded-lg border ${config.border} ${config.bg} p-4`}>
                   <StatusIcon className={`h-6 w-6 ${config.color}`} />
                   <div className="flex flex-col">
@@ -140,7 +156,6 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
                   </div>
                 </div>
 
-                {/* Eğer BLOKE ise Sistem Uyarısı */}
                 {task.status === 'BLOCKED' && (
                   <div className="flex items-start gap-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-4">
                     <ShieldAlert className="h-5 w-5 shrink-0 text-rose-500" />
@@ -153,7 +168,6 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
                   </div>
                 )}
 
-                {/* Operasyonel Metrikler */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1 rounded border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/50">
                     <span className="font-mono text-[10px] text-slate-500">TAHMİNİ SÜRE</span>
@@ -171,7 +185,14 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
                   </div>
                 </div>
 
-                {/* Ekipman ve Malzeme İhtiyacı */}
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                  <div>
+                    <h3 className="font-sans text-sm font-bold text-slate-800 dark:text-slate-300">Atanan Personeller</h3>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Görev ekibindeki personeller.</p>
+                  </div>
+                  <TaskAssigneeControl task={task} onUpdated={onTaskUpdated} />
+                </div>
+
                 <div className="flex flex-col gap-3">
                   <h3 className="font-sans text-sm font-bold text-slate-800 dark:text-slate-300">Gerekli Kaynaklar</h3>
                   <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
@@ -218,11 +239,25 @@ export default function TaskDetailDrawer({ isOpen, task, onClose, onTaskUpdated 
               </div>
             </div>
 
-            {/* Alt Aksiyon Butonları */}
-            <div className="border-t border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-900/80">
-              <button onClick={completeTask} disabled={task.status === 'COMPLETED'} className="rounded bg-cyan-600 py-2.5 font-sans text-xs font-bold text-white shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
-                GÖREVİ TAMAMLA
-              </button>
+            {/* Alt Aksiyon Butonları - YENİLENMİŞ YAPI */}
+            <div className="flex flex-col border-t border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-900/80">
+              {task.status === 'COMPLETED' ? (
+                <button
+                  onClick={revertTask}
+                  className="flex w-full items-center justify-center gap-2 rounded border border-amber-500/50 bg-amber-500/10 py-2.5 font-sans text-xs font-bold text-amber-500 shadow-sm transition-colors hover:bg-amber-500/20"
+                >
+                  <Undo className="h-4 w-4" />
+                  İŞLEME GERİ AL
+                </button>
+              ) : (
+                <button
+                  onClick={completeTask}
+                  className="flex w-full items-center justify-center gap-2 rounded bg-cyan-600 py-2.5 font-sans text-xs font-bold text-white shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-colors hover:bg-cyan-500"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  GÖREVİ TAMAMLA
+                </button>
+              )}
             </div>
           </motion.div>
         </>
